@@ -117,7 +117,7 @@ export async function listEventsHandler(req: HttpRequest): Promise<HttpResponseI
     let ticketCategories: any[] = [];
     if (eventIds.length > 0) {
         const tcRequest = pool.request();
-        const idsList = eventIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',');
+        const idsList = eventIds.map((id: string) => `'${id.replace(/'/g, "''")}'`).join(',');
         const tcResult = await tcRequest.query(`SELECT * FROM TicketCategories WHERE event_id IN (${idsList})`);
         ticketCategories = tcResult.recordset;
     }
@@ -165,7 +165,7 @@ export async function getEventHandler(req: HttpRequest): Promise<HttpResponseIni
     const relatedIds = relatedEvents.map((e: any) => e.id);
     let relatedCategories: any[] = [];
     if (relatedIds.length > 0) {
-        const idsList = relatedIds.map(rid => `'${rid.replace(/'/g, "''")}'`).join(',');
+        const idsList = relatedIds.map((rid: string) => `'${rid.replace(/'/g, "''")}'`).join(',');
         const rcResult = await pool.request().query(`SELECT * FROM TicketCategories WHERE event_id IN (${idsList})`);
         relatedCategories = rcResult.recordset;
     }
@@ -204,7 +204,7 @@ export async function featuredEventsHandler(req: HttpRequest): Promise<HttpRespo
     const eventIds = events.map((e: any) => e.id);
     let ticketCategories: any[] = [];
     if (eventIds.length > 0) {
-        const idsList = eventIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',');
+        const idsList = eventIds.map((id: string) => `'${id.replace(/'/g, "''")}'`).join(',');
         const tcResult = await pool.request().query(`SELECT * FROM TicketCategories WHERE event_id IN (${idsList})`);
         ticketCategories = tcResult.recordset;
     }
@@ -243,7 +243,7 @@ export async function searchEventsHandler(req: HttpRequest): Promise<HttpRespons
     const eventIds = events.map((e: any) => e.id);
     let ticketCategories: any[] = [];
     if (eventIds.length > 0) {
-        const idsList = eventIds.map(id => `'${id.replace(/'/g, "''")}'`).join(',');
+        const idsList = eventIds.map((id: string) => `'${id.replace(/'/g, "''")}'`).join(',');
         const tcResult = await pool.request().query(`SELECT * FROM TicketCategories WHERE event_id IN (${idsList})`);
         ticketCategories = tcResult.recordset;
     }

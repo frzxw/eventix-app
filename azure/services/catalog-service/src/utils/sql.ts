@@ -1,6 +1,6 @@
 import sql from 'mssql';
 
-const config: sql.config = {
+const config = {
     user: process.env.SQL_USER || 'sa',
     password: process.env.SQL_PASSWORD || 'StrongPassword123!',
     server: process.env.SQL_SERVER || 'localhost',
@@ -11,9 +11,9 @@ const config: sql.config = {
     },
 };
 
-let pool: sql.ConnectionPool;
+let pool: any;
 
-export async function getSqlPool(): Promise<sql.ConnectionPool> {
+export async function getSqlPool(): Promise<any> {
     if (!pool) {
         try {
             pool = await sql.connect(config);

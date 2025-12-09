@@ -1,6 +1,6 @@
 import sql from 'mssql';
 
-const config: sql.config = {
+const config = {
   user: process.env.SQL_USER,
   password: process.env.SQL_PASSWORD,
   server: process.env.SQL_SERVER || 'localhost',
@@ -11,7 +11,7 @@ const config: sql.config = {
   },
 };
 
-let pool: sql.ConnectionPool | null = null;
+let pool: any = null;
 
 export async function getDb() {
   if (pool) return pool;
