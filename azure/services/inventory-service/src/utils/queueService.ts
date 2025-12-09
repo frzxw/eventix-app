@@ -1,12 +1,5 @@
 import { randomUUID } from 'crypto';
-import { containers } from './cosmos';
 import { redis } from './redisClient';
-import {
-  HOLD_TTL_SECONDS,
-  acquireHold,
-  claimHold,
-  releaseHold,
-} from './holdService';
 
 export type QueueSelection = {
   categoryId: string;
@@ -68,47 +61,134 @@ export type QueueHoldClaimResponse = {
 };
 
 const QUEUE_KEY_PREFIX = 'queue:';
+const QUEUE_DETAILS_PREFIX = 'queue:details:';
 
 export async function enqueueQueueRequest(request: QueueJoinRequest): Promise<QueueJoinResult> {
-  // Simplified queue logic for now - just return a mock response or implement basic Redis list
-  // In a real implementation, this would add to a Redis List or Sorted Set
   const queueId = randomUUID();
+  const now = Date.now();
+  const eventQueueKey = `${QUEUE_KEY_PREFIX}${request.eventId}`;
+  
+  // Add to sorted set with timestamp as score
+  await redis.zadd(eventQueueKey, now, queueId);
+  
+  // Store details
+  const detailsKey = `${QUEUE_DETAILS_PREFIX}${queueId}`;
+  const entry: QueueEntry = {
+      ...request,
+      queueId,
+      status: 'queued',
+      createdAtIso: new Date(now).toISOString()
+  };
+  await redis.setex(detailsKey, 3600, JSON.stringify(entry));
+
+  // Get position
+  const rank = await redis.zrank(eventQueueKey, queueId);
+  const position = (rank ?? 0) + 1;
+  
+  // Estimate ETA (e.g., 10 seconds per 100 users)
+  const etaSeconds = Math.ceil(position / 10) * 5; 
+
   return {
     queueId,
-    position: 1,
-    etaSeconds: 5
+    position,
+    etaSeconds
   };
 }
 
 export async function getQueueStatus(queueId: string, _correlationId?: string): Promise<QueueStatusResponse | null> {
-  // Mock implementation: Always return ready to unblock the flow
-  const now = Date.now();
-  const expiresAtIso = new Date(now + 600 * 1000).toISOString(); // 10 minutes from now
+  const detailsKey = `${QUEUE_DETAILS_PREFIX}${queueId}`;
+  const detailsStr = await redis.get(detailsKey);
+  
+  if (!detailsStr) return null;
+  
+  const details = JSON.parse(detailsStr) as QueueEntry;
+  const eventQueueKey = `${QUEUE_KEY_PREFIX}${details.eventId}`;
+  
+  const rank = await redis.zrank(eventQueueKey, queueId);
+  
+  if (rank === null) {
+      // Not in queue? Maybe expired or processed?
+      return { queueId, status: 'expired' };
+  }
+  
+  const position = rank + 1;
+  
+  // Logic for "Ready":
+  // If position is within the "allowed" window. 
+  // For this demo, let's say top 50 are always "ready" to try.
+  const ALLOWED_CONCURRENCY = 50;
+  
+  if (position <= ALLOWED_CONCURRENCY) {
+      return {
+          queueId,
+          status: 'ready',
+          position,
+          etaSeconds: 0,
+          message: 'You are next! Proceed to booking.',
+          // In a real flow, we might generate a temporary "pass" token here
+          holdToken: queueId, // Reusing queueId as a simple token for now
+          holdExpiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString()
+      };
+  }
 
   return {
-    queueId,
-    status: 'ready',
-    position: 0,
-    etaSeconds: 0,
-    message: 'Your turn! Proceed to checkout.',
-    holdToken: randomUUID(),
-    holdExpiresAt: expiresAtIso
+      queueId,
+      status: 'queued',
+      position,
+      etaSeconds: Math.ceil(position / 10) * 5
   };
 }
 
-export async function leaveQueue(_queueId: string, _correlationId?: string): Promise<boolean> {
-  // Mock implementation
+export async function leaveQueue(queueId: string, _correlationId?: string): Promise<boolean> {
+  const detailsKey = `${QUEUE_DETAILS_PREFIX}${queueId}`;
+  const detailsStr = await redis.get(detailsKey);
+  
+  if (!detailsStr) return false;
+  
+  const details = JSON.parse(detailsStr) as QueueEntry;
+  const eventQueueKey = `${QUEUE_KEY_PREFIX}${details.eventId}`;
+  
+  await redis.zrem(eventQueueKey, queueId);
+  await redis.del(detailsKey);
+  
   return true;
 }
 
-export async function claimQueueHold(_queueId: string, correlationId?: string, _claimToken?: string): Promise<QueueHoldClaimResponse> {
+export async function claimQueueHold(queueId: string, correlationId?: string, _claimToken?: string): Promise<QueueHoldClaimResponse> {
+  // In this simplified Redis implementation, if they are in the "ready" zone, they can proceed.
+  // We verify they are still in the queue and in the top N.
+  const detailsKey = `${QUEUE_DETAILS_PREFIX}${queueId}`;
+  const detailsStr = await redis.get(detailsKey);
+  
+  if (!detailsStr) {
+      return { success: false, reason: 'QUEUE_EXPIRED' };
+  }
+  
+  const details = JSON.parse(detailsStr) as QueueEntry;
+  const eventQueueKey = `${QUEUE_KEY_PREFIX}${details.eventId}`;
+  const rank = await redis.zrank(eventQueueKey, queueId);
+  
+  if (rank === null) {
+      return { success: false, reason: 'NOT_IN_QUEUE' };
+  }
+  
+  // Allow top 50
+  if (rank > 50) {
+      return { success: false, reason: 'NOT_READY', retryAfterSeconds: 5 };
+  }
+
+  // They are ready. We could remove them from queue here or let them expire.
+  // Let's remove them to free up space for others.
+  await redis.zrem(eventQueueKey, queueId);
+  await redis.del(detailsKey);
+
   const now = Date.now();
   const expiresAtIso = new Date(now + 600 * 1000).toISOString();
 
   return {
     success: true,
     holdId: randomUUID(),
-    holdToken: randomUUID(),
+    holdToken: queueId, // Use queueId as token
     holdExpiresAt: expiresAtIso,
     correlationId
   };

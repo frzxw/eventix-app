@@ -42,7 +42,8 @@ type ClaimHoldBody = z.infer<typeof claimHoldSchema>;
 export async function joinQueueHandler(req: HttpRequest): Promise<HttpResponseInit> {
   try {
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown';
-    const rateLimit = await checkRateLimit(ip, 'queue_join', 10, 60);
+    // Increased rate limit for load testing: 10000 requests per 60 seconds
+    const rateLimit = await checkRateLimit(ip, 'queue_join', 10000, 60);
 
     if (!rateLimit.allowed) {
       return tooManyRequests(rateLimit.retryAfter);
