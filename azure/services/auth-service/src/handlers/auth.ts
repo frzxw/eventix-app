@@ -90,7 +90,7 @@ export async function signupHandler(req: HttpRequest): Promise<HttpResponseInit>
       firstName,
       lastName,
       phone: phoneNumber ?? null,
-      emailVerified: false,
+      emailVerified: true, // Auto-verify since we don't have SMTP yet
     });
 
     const tokenPair = generateTokenPair({ sub: newUser.id, email: newUser.email, firstName: newUser.firstName, lastName: newUser.lastName });

@@ -84,8 +84,8 @@ export function SignUpPage() {
       return;
     }
 
-    toast.success('Account created successfully! Please verify your email.');
-    navigate('/auth/verify-email', { state: { email: formData.email.trim() } });
+    toast.success('Account created successfully!');
+    navigate('/');
   };
 
   const handleSocialSignUp = (provider: string) => {

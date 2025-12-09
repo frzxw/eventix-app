@@ -14,5 +14,8 @@
     "SQL_PASSWORD": "StrongPassword123!",
     "SERVICE_BUS_CONNECTION_STRING": "Endpoint=sb://eventix-sb-namespace.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=<key>",
     "APPINSIGHTS_CONNECTION_STRING": ""
+  },
+  "Host": {
+    "CORS": "*"
   }
 }
