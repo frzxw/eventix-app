@@ -75,6 +75,7 @@ export async function createOrderHandler(req: HttpRequest): Promise<HttpResponse
       {
         userId,
         eventId: body.eventId,
+        subtotal: totalAmount,
         totalAmount,
         currency: 'USD', // Default for now
         status: 'pending_payment',
@@ -100,10 +101,12 @@ export async function createOrderHandler(req: HttpRequest): Promise<HttpResponse
 
     return created({
       success: true,
-      orderId: order.id,
-      orderNumber: order.order_number,
-      status: order.status,
-      paymentLink: `/checkout/${order.id}`, // Mock link
+      data: {
+        orderId: order.id,
+        orderNumber: order.order_number,
+        status: order.status,
+        paymentLink: `/checkout/${order.id}`, // Mock link
+      },
     });
 
   } catch (error: any) {

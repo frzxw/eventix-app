@@ -7,8 +7,8 @@ describe('Ticket Service Integration', () => {
 
   it('should require auth for my-tickets', async () => {
     try {
-      const response = await request(baseUrl)
-        .get('/my-tickets');
+      const response = await request(ticketUrl)
+        .get('/tickets/my-tickets');
       
       expect(response.status).toBe(401);
     } catch (error: any) {

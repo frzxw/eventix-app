@@ -53,6 +53,7 @@ export async function createOrderTransaction(
   orderData: {
     userId: string;
     eventId: string;
+    subtotal: number;
     totalAmount: number;
     currency: string;
     status: string;
@@ -81,6 +82,7 @@ export async function createOrderTransaction(
       .input('orderNumber', sql.NVarChar, orderNumber)
       .input('userId', sql.NVarChar, orderData.userId)
       .input('eventId', sql.NVarChar, orderData.eventId)
+      .input('subtotal', sql.Decimal(10, 2), orderData.subtotal)
       .input('totalAmount', sql.Decimal(10, 2), orderData.totalAmount)
       .input('currency', sql.NVarChar, orderData.currency)
       .input('status', sql.NVarChar, orderData.status)
@@ -93,12 +95,12 @@ export async function createOrderTransaction(
       .input('holdToken', sql.NVarChar, orderData.holdToken)
       .query(`
         INSERT INTO Orders (
-          order_number, user_id, event_id, total_amount, currency, status, payment_status,
+          order_number, user_id, event_id, subtotal, total_amount, currency, status, payment_status,
           attendee_first_name, attendee_last_name, attendee_email, attendee_phone, expires_at, hold_token
         )
         OUTPUT INSERTED.*
         VALUES (
-          @orderNumber, @userId, @eventId, @totalAmount, @currency, @status, @paymentStatus,
+          @orderNumber, @userId, @eventId, @subtotal, @totalAmount, @currency, @status, @paymentStatus,
           @attendeeFirstName, @attendeeLastName, @attendeeEmail, @attendeePhone, @expiresAt, @holdToken
         )
       `);

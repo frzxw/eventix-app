@@ -49,7 +49,7 @@ export function QueueModal({
 
   return (
     <Dialog open={open} onOpenChange={() => undefined}>
-      <DialogContent className="glass max-w-lg border-[var(--border-glass)]" aria-live="polite" aria-busy={stage === 'in-queue'}>
+      <DialogContent className="glass w-[95vw] max-w-2xl border-[var(--border-glass)]" aria-live="polite" aria-busy={stage === 'in-queue'}>
         <DialogHeader>
           <DialogTitle className="text-2xl" style={{ fontWeight: 'var(--font-weight-medium)' }}>
             {heading}

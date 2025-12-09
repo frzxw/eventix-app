@@ -31,7 +31,7 @@ export interface TicketCategory {
   display_name: string;
   description?: string;
   price: number;
-  total_quantity: number;
+  quantity_total: number;
   available_quantity: number;
   max_per_order: number;
   sale_start_date?: Date;

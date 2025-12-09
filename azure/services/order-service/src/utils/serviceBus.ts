@@ -18,7 +18,16 @@ function getClient(): ServiceBusClient {
   return cachedClient;
 }
 
+function isMockConnection(): boolean {
+  return !connectionString || connectionString.includes('eventix-sb-namespace') || connectionString.includes('<key>');
+}
+
 export async function sendToQueue(queueName: string, messageBody: Record<string, unknown>, sessionId: string, subject: string = 'message'): Promise<void> {
+  if (isMockConnection()) {
+    console.log(`[MOCK] Sending to queue ${queueName}:`, JSON.stringify(messageBody, null, 2));
+    return;
+  }
+
   const client = getClient();
 
   const sender = client.createSender(queueName);
@@ -43,6 +52,11 @@ export async function sendToQueue(queueName: string, messageBody: Record<string,
 }
 
 export async function publishToTopic(topicName: string, messageBody: Record<string, unknown>, subject: string, sessionId?: string): Promise<void> {
+  if (isMockConnection()) {
+    console.log(`[MOCK] Publishing to topic ${topicName}:`, JSON.stringify(messageBody, null, 2));
+    return;
+  }
+
   const client = getClient();
 
   const sender = client.createSender(topicName);

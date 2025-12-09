@@ -61,7 +61,7 @@ export async function confirmInventory(
         .input('categoryId', sql.NVarChar, categoryId)
         .query(`
         UPDATE TicketCategories
-        SET total_quantity = total_quantity -- No change to total
+        SET quantity_total = quantity_total -- No change to total
         -- potentially update a sold counter if exists
         WHERE id = @categoryId
         `);

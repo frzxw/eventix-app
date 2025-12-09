@@ -287,7 +287,7 @@ function transformEvent(event: any, categories: any[]) {
 }
 
 function mapTicketCategory(category: any) {
-  const total = typeof category.total_quantity === 'number' ? category.total_quantity : 0;
+  const total = typeof category.quantity_total === 'number' ? category.quantity_total : 0;
   const available = typeof category.available_quantity === 'number' ? category.available_quantity : 0;
   const status = category.status || (available === 0 ? 'sold-out' : 'available');
 

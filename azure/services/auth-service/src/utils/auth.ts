@@ -31,11 +31,14 @@ export interface JWTPayload {
 }
 
 export function signAccessToken(payload: Omit<JWTPayload, 'type' | 'iat' | 'exp'>): string {
-  return jwt.sign({ ...payload, type: 'access' }, JWT_SECRET as Secret, { expiresIn: JWT_EXPIRY as any });
+  // Add random jitter to payload to ensure unique tokens even if generated in same second
+  const jitter = Math.random().toString(36).substring(7);
+  return jwt.sign({ ...payload, type: 'access', jti: jitter }, JWT_SECRET as Secret, { expiresIn: JWT_EXPIRY as any });
 }
 
 export function signRefreshToken(userId: string): string {
-  return jwt.sign({ sub: userId, type: 'refresh' }, JWT_REFRESH_SECRET as Secret, { expiresIn: JWT_REFRESH_EXPIRY as any });
+  const jitter = Math.random().toString(36).substring(7);
+  return jwt.sign({ sub: userId, type: 'refresh', jti: jitter }, JWT_REFRESH_SECRET as Secret, { expiresIn: JWT_REFRESH_EXPIRY as any });
 }
 
 export function verifyAccessToken(token: string): JWTPayload | null {

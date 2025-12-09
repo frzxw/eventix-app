@@ -13,7 +13,7 @@ export async function reservationExpiryHandler(myTimer: any, context: Invocation
     .query(`
       SELECT * FROM Orders 
       WHERE status = 'pending_payment' 
-      AND expiresAt < GETDATE()
+      AND expires_at < GETDATE()
     `);
     
   const expiredOrders = result.recordset;
@@ -42,10 +42,10 @@ export async function reservationExpiryHandler(myTimer: any, context: Invocation
       // Get order items to release inventory
       const itemsResult = await new sql.Request(tx)
         .input('orderId', sql.NVarChar, order.id)
-        .query('SELECT * FROM OrderItems WHERE orderId = @orderId');
+        .query('SELECT * FROM OrderItems WHERE order_id = @orderId');
         
       for (const item of itemsResult.recordset) {
-        await releaseInventory(tx, item.categoryId, item.quantity);
+        await releaseInventory(tx, item.category_id, item.quantity);
       }
       
       // Update order status

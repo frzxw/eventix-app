@@ -57,6 +57,16 @@ export type QueueStatusResponse = {
   message?: string;
 };
 
+export type QueueHoldClaimResponse = {
+  success: boolean;
+  holdId?: string;
+  holdToken?: string;
+  holdExpiresAt?: string;
+  correlationId?: string;
+  retryAfterSeconds?: number;
+  reason?: string;
+};
+
 const QUEUE_KEY_PREFIX = 'queue:';
 
 export async function enqueueQueueRequest(request: QueueJoinRequest): Promise<QueueJoinResult> {
@@ -67,5 +77,39 @@ export async function enqueueQueueRequest(request: QueueJoinRequest): Promise<Qu
     queueId,
     position: 1,
     etaSeconds: 5
+  };
+}
+
+export async function getQueueStatus(queueId: string, _correlationId?: string): Promise<QueueStatusResponse | null> {
+  // Mock implementation: Always return ready to unblock the flow
+  const now = Date.now();
+  const expiresAtIso = new Date(now + 600 * 1000).toISOString(); // 10 minutes from now
+
+  return {
+    queueId,
+    status: 'ready',
+    position: 0,
+    etaSeconds: 0,
+    message: 'Your turn! Proceed to checkout.',
+    holdToken: randomUUID(),
+    holdExpiresAt: expiresAtIso
+  };
+}
+
+export async function leaveQueue(_queueId: string, _correlationId?: string): Promise<boolean> {
+  // Mock implementation
+  return true;
+}
+
+export async function claimQueueHold(_queueId: string, correlationId?: string, _claimToken?: string): Promise<QueueHoldClaimResponse> {
+  const now = Date.now();
+  const expiresAtIso = new Date(now + 600 * 1000).toISOString();
+
+  return {
+    success: true,
+    holdId: randomUUID(),
+    holdToken: randomUUID(),
+    holdExpiresAt: expiresAtIso,
+    correlationId
   };
 }
