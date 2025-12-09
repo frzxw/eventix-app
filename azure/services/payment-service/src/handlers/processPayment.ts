@@ -1,5 +1,6 @@
 import { HttpRequest, HttpResponseInit } from '@azure/functions';
 import { z } from 'zod';
+import { getDb, sql } from '../utils/db';
 import {
   checkIdempotency,
   lockIdempotencyKey,
@@ -65,6 +66,20 @@ export async function processPaymentHandler(req: HttpRequest): Promise<HttpRespo
     // In a real app, we would call Stripe/PayPal here
     const paymentReference = `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
     const paidAt = new Date().toISOString();
+
+    // Save to PaymentLogs
+    const pool = await getDb();
+    await pool.request()
+        .input('orderId', sql.NVarChar, body.orderId)
+        .input('paymentMethod', sql.NVarChar, body.paymentMethod)
+        .input('amount', sql.Decimal(10, 2), body.amount)
+        .input('currency', sql.NVarChar, body.currency)
+        .input('status', sql.NVarChar, 'completed')
+        .input('gatewayReference', sql.NVarChar, paymentReference)
+        .query(`
+            INSERT INTO PaymentLogs (order_id, paymentMethod, amount, currency, status, gateway_reference)
+            VALUES (@orderId, @paymentMethod, @amount, @currency, @status, @gatewayReference)
+        `);
 
     // Send to Finalization Queue (Order Service listens to this)
     await sendToFinalizationQueue({
