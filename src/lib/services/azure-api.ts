@@ -10,7 +10,7 @@ import axios, {
   InternalAxiosRequestConfig,
   AxiosResponse,
 } from 'axios';
-import { API } from '../constants';
+import { API, SERVICES } from '../constants';
 import { logger } from './logger';
 import {
   AuthStoredUser,
@@ -285,25 +285,25 @@ class AzureApiClient {
     limit?: number;
     sort?: string;
   }) {
-    const response = await this.client.get('/events', { params });
+    const response = await this.client.get(`${SERVICES.CATALOG}/events`, { params });
     logger.debug('Events fetched', { count: response.data.events?.length });
     return response.data;
   }
 
   async getEventById(eventId: string) {
-    const response = await this.client.get(`/events/${eventId}`);
+    const response = await this.client.get(`${SERVICES.CATALOG}/events/${eventId}`);
     logger.debug('Event fetched', { eventId });
     return response.data;
   }
 
   async getFeaturedEvents() {
-    const response = await this.client.get('/events/featured');
+    const response = await this.client.get(`${SERVICES.CATALOG}/events/featured`);
     logger.debug('Featured events fetched', { count: response.data.events?.length });
     return response.data;
   }
 
   async searchEvents(query: string) {
-    const response = await this.client.get('/search', {
+    const response = await this.client.get(`${SERVICES.CATALOG}/search`, {
       params: { q: query },
     });
     logger.debug('Events searched', { query, count: response.data.events?.length });
@@ -312,7 +312,7 @@ class AzureApiClient {
 
   // -------- Orders --------
   async createOrder(eventId: string, tickets: any[], attendeeInfo: any) {
-    const response = await this.client.post('/orders/create', {
+    const response = await this.client.post(`${SERVICES.ORDER}/orders/create`, {
       eventId,
       tickets,
       attendeeInfo,
@@ -323,7 +323,7 @@ class AzureApiClient {
   }
 
   async confirmOrder(orderId: string, paymentReference: string) {
-    const response = await this.client.post(`/orders/${orderId}/confirm`, {
+    const response = await this.client.post(`${SERVICES.ORDER}/orders/${orderId}/confirm`, {
       paymentReference,
     });
     
@@ -332,36 +332,36 @@ class AzureApiClient {
   }
 
   async getOrder(orderId: string) {
-    const response = await this.client.get(`/orders/${orderId}`);
+    const response = await this.client.get(`${SERVICES.ORDER}/orders/${orderId}`);
     return response.data;
   }
 
   async getMyOrders(params?: { status?: string; page?: number }) {
-    const response = await this.client.get('/orders/my-orders', { params });
+    const response = await this.client.get(`${SERVICES.ORDER}/orders/my-orders`, { params });
     logger.debug('Orders fetched', { count: response.data.orders?.length });
     return response.data;
   }
 
   async cancelOrder(orderId: string, reason?: string) {
-    const response = await this.client.post(`/orders/${orderId}/cancel`, { reason });
+    const response = await this.client.post(`${SERVICES.ORDER}/orders/${orderId}/cancel`, { reason });
     logger.info('Order cancelled', { orderId });
     return response.data;
   }
 
   // -------- Tickets --------
   async getMyTickets(params?: { page?: number; limit?: number }) {
-    const response = await this.client.get('/tickets/my-tickets', { params });
+    const response = await this.client.get(`${SERVICES.TICKET}/tickets/my-tickets`, { params });
     logger.debug('Tickets fetched', { count: response.data.tickets?.length });
     return response.data;
   }
 
   async getTicketById(ticketId: string) {
-    const response = await this.client.get(`/tickets/${ticketId}`);
+    const response = await this.client.get(`${SERVICES.TICKET}/tickets/${ticketId}`);
     return response.data;
   }
 
   async downloadTicketPDF(ticketId: string) {
-    const response = await this.client.get(`/tickets/${ticketId}/download`, {
+    const response = await this.client.get(`${SERVICES.TICKET}/tickets/${ticketId}/download`, {
       responseType: 'blob',
     });
     logger.info('Ticket PDF downloaded', { ticketId });
@@ -369,7 +369,7 @@ class AzureApiClient {
   }
 
   async transferTicket(ticketId: string, toEmail: string) {
-    const response = await this.client.post(`/tickets/${ticketId}/transfer`, {
+    const response = await this.client.post(`${SERVICES.TICKET}/tickets/${ticketId}/transfer`, {
       toEmail,
     });
     

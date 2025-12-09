@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { PhoneInput } from '../ui/phone-input';
+import { HoldTimer } from './HoldTimer';
 import type { Event } from '../../lib/types';
 import type { TicketSelection } from './BookingStep1';
 import { formatCurrency } from '../../lib/utils';
@@ -325,14 +326,19 @@ export function BookingStep2({ event, selections, onContinue, onBack, holdInfo }
           <div className="glass-strong backdrop-blur-2xl border border-[var(--border-glass)] rounded-full shadow-2xl shadow-[var(--primary-500)]/10">
             <div className="px-6 sm:px-8 py-4 sm:py-5">
               <div className="flex items-center justify-between gap-4">
-                <Button
-                  variant="outline"
-                  onClick={onBack}
-                  className="glass-hover rounded-full px-6"
-                >
-                  <ChevronLeft className="w-5 h-5 mr-2" />
-                  Back
-                </Button>
+                <div className="flex items-center gap-4">
+                  <Button
+                    variant="outline"
+                    onClick={onBack}
+                    className="glass-hover rounded-full px-6"
+                  >
+                    <ChevronLeft className="w-5 h-5 mr-2" />
+                    Back
+                  </Button>
+                  {holdInfo?.holdExpiresAt && (
+                    <HoldTimer expiresAt={holdInfo.holdExpiresAt} onExpire={onBack} />
+                  )}
+                </div>
                 
                 <Button
                   size="lg"

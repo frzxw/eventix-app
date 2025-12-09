@@ -1,3 +1,5 @@
+import { SERVICES } from "@/lib/constants";
+
 /**
  * Eventix API Client
  * Frontend service for communicating with Azure Functions backend
@@ -192,7 +194,7 @@ export const bookings = {
     idempotencyKey?: string;
     correlationId?: string;
   }): Promise<{ data?: any; error?: string; status?: number }> {
-    return request("/orders/create", {
+    return request(`${SERVICES.ORDER}/orders`, {
       method: "POST",
       body: data,
       headers: {
@@ -206,7 +208,7 @@ export const bookings = {
    * GET /api/bookings/:id
    */
   async getById(id: string): Promise<{ data?: any; error?: string }> {
-    return request(`/orders/${id}`);
+    return request(`${SERVICES.ORDER}/orders/${id}`);
   },
 
   /**
@@ -225,7 +227,7 @@ export const bookings = {
     if (params?.limit) query.append("limit", params.limit.toString());
 
     const queryString = query.toString();
-    const path = queryString.length > 0 ? `/orders/my-orders?${queryString}` : "/orders/my-orders";
+    const path = queryString.length > 0 ? `${SERVICES.ORDER}/orders/my-orders?${queryString}` : `${SERVICES.ORDER}/orders/my-orders`;
     return request<{ orders: any[]; total: number; page: number; totalPages: number }>(path);
   },
 };
@@ -238,14 +240,14 @@ export const tickets = {
    * GET /api/tickets/:orderId
    */
   async getByOrderId(orderId: string): Promise<{ data?: any[]; error?: string }> {
-    return request(`/tickets/${orderId}`);
+    return request(`${SERVICES.TICKET}/tickets/${orderId}`);
   },
 
   /**
    * POST /api/tickets/:orderId/validate
    */
   async validate(ticketId: string): Promise<{ data?: any; error?: string }> {
-    return request(`/tickets/${ticketId}/validate`, {
+    return request(`${SERVICES.TICKET}/tickets/${ticketId}/validate`, {
       method: "POST",
       body: { ticketId },
     });

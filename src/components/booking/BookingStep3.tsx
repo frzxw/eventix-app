@@ -18,6 +18,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Checkbox } from '../ui/checkbox';
+import { HoldTimer } from './HoldTimer';
 import type { Event } from '../../lib/types';
 import type { TicketSelection } from './BookingStep1';
 import type { AttendeeInfo } from './BookingStep2';
@@ -413,15 +414,20 @@ export function BookingStep3({
           <div className="glass-strong backdrop-blur-2xl border border-[var(--border-glass)] rounded-full shadow-2xl shadow-[var(--primary-500)]/10">
             <div className="px-6 sm:px-8 py-4 sm:py-5">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <Button
-                  variant="outline"
-                  onClick={onBack}
-                  disabled={isProcessing}
-                  className="glass-hover rounded-full px-6"
-                >
-                  <ChevronLeft className="w-5 h-5 mr-2" />
-                  Back
-                </Button>
+                <div className="flex items-center gap-4">
+                  <Button
+                    variant="outline"
+                    onClick={onBack}
+                    disabled={isProcessing}
+                    className="glass-hover rounded-full px-6"
+                  >
+                    <ChevronLeft className="w-5 h-5 mr-2" />
+                    Back
+                  </Button>
+                  {holdInfo?.holdExpiresAt && (
+                    <HoldTimer expiresAt={holdInfo.holdExpiresAt} onExpire={onBack} />
+                  )}
+                </div>
                 
                 <div className="flex items-center gap-4 w-full sm:w-auto">
                   <div className="hidden sm:block text-right">

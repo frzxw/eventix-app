@@ -18,6 +18,7 @@ export function CheckoutPage() {
   const booking = useBookingStateMachine();
 
   const [currentStep, setCurrentStep] = useState<BookingStep>(1);
+  const [showQueueSuccess, setShowQueueSuccess] = useState(false);
   const [ticketSelections, setTicketSelections] = useState<TicketSelection[]>([]);
   const [attendeeInfo, setAttendeeInfo] = useState<AttendeeInfo | null>(null);
 
@@ -129,7 +130,12 @@ export function CheckoutPage() {
 
   useEffect(() => {
     if (!isLoading && booking.state.stage === 'ready-with-hold' && hasSelections) {
-      setCurrentStep((step) => (step < 2 ? 2 : step));
+      setShowQueueSuccess(true);
+      const timer = setTimeout(() => {
+        setShowQueueSuccess(false);
+        setCurrentStep((step) => (step < 2 ? 2 : step));
+      }, 2000);
+      return () => clearTimeout(timer);
     }
   }, [booking.state.stage, hasSelections, isLoading]);
 
@@ -163,10 +169,9 @@ export function CheckoutPage() {
         <p className="text-[var(--text-secondary)] mb-6">
           {error ?? 'The event you&rsquo;re looking for doesn&rsquo;t exist.'}
         </p>
-        <button
+        <button 
           onClick={() => navigate('/')}
-          className="text-[var(--primary-400)] hover:text-[var(--primary-300)] transition-smooth"
-        >
+          className="text-[var(--primary-400)] hover:text-[var(--primary-300)] transition-smooth">
           Return to Home
         </button>
       </div>
@@ -219,7 +224,7 @@ export function CheckoutPage() {
       )}
 
       <QueueModal
-        open={booking.state.stage === 'in-queue'}
+        open={booking.state.stage === 'in-queue' || showQueueSuccess}
         stage={booking.state.stage}
         queuePosition={booking.state.queuePosition}
         etaSeconds={booking.state.queueEtaSeconds}
