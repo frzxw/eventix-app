@@ -51,7 +51,7 @@ export async function reservationExpiryHandler(myTimer: any, context: Invocation
       // Update order status
       await new sql.Request(tx)
         .input('id', sql.NVarChar, order.id)
-        .query("UPDATE Orders SET status = 'cancelled', paymentStatus = 'expired' WHERE id = @id");
+        .query("UPDATE Orders SET status = 'cancelled', payment_status = 'expired' WHERE id = @id");
         
       await tx.commit();
       
