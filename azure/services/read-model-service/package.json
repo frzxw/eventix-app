@@ -1,0 +1,22 @@
+{
+  "name": "read-model-service",
+  "version": "1.0.0",
+  "description": "Eventix Read Model Service (Projections)",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "start": "func start",
+    "test": "echo \"No tests yet\""
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0",
+    "@azure/cosmos": "^4.0.0",
+    "@azure/service-bus": "^7.9.5",
+    "applicationinsights": "^2.9.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/node": "^18.0.0"
+  }
+}

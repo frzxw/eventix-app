@@ -1,0 +1,14 @@
+{
+  "bindings": [
+    {
+      "name": "message",
+      "type": "serviceBusTrigger",
+      "direction": "in",
+      "topicName": "order-paid",
+      "subscriptionName": "ticket-service",
+      "connection": "SERVICE_BUS_CONNECTION_STRING"
+    }
+  ],
+  "scriptFile": "../dist/src/handlers/generateTickets.js",
+  "entryPoint": "generateTicketsHandler"
+}

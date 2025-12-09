@@ -1,0 +1,49 @@
+@echo off
+setlocal
+call "%~dp0\00-az-variables.cmd"
+
+echo Logging into Azure (use az login --use-device-code if browser fails)...
+az account show >nul 2>&1
+if errorlevel 1 (
+  az login || az login --use-device-code || (echo Login failed. && exit /b 1)
+) else (
+  echo Azure CLI session already active. Skipping az login.
+)
+
+if not "%AZ_SUBSCRIPTION_ID%"=="" (
+  echo Setting subscription %AZ_SUBSCRIPTION_ID% ...
+  az account set --subscription %AZ_SUBSCRIPTION_ID% || (echo Failed to set subscription && exit /b 1)
+)
+
+if "%AZ_SQL_ADMIN_PASSWORD%"=="" (
+  echo ERROR: AZ_SQL_ADMIN_PASSWORD is empty. Set it in 00-az-variables.local.cmd and re-run.
+  exit /b 1
+)
+
+if "%AZ_DEPLOYER_OBJECT_ID%"=="" (
+  echo ERROR: AZ_DEPLOYER_OBJECT_ID is empty. Set it in 00-az-variables.local.cmd (use az ad signed-in-user show) and re-run.
+  exit /b 1
+)
+
+echo Creating resource group %AZ_RG% in %AZ_LOCATION% ...
+az group create --name %AZ_RG% --location %AZ_LOCATION% || exit /b 1
+
+echo Deploying Azure Functions infrastructure via Bicep template ...
+az deployment group create ^
+  --resource-group %AZ_RG% ^
+  --template-file "%~dp0..\infrastructure\main.bicep" ^
+  --parameters ^
+    location=%AZ_LOCATION% ^
+    projectName=eventix ^
+    environment=prod ^
+    deployStaticWebApp=%AZ_DEPLOY_STATIC_WEB_APP% ^
+    staticWebAppLocation=%AZ_STATIC_WEB_APP_LOCATION% ^
+    staticWebAppSkuName=%AZ_STATIC_WEB_APP_SKU_NAME% ^
+    staticWebAppSkuTier=%AZ_STATIC_WEB_APP_SKU_TIER% ^
+    deployerObjectId=%AZ_DEPLOYER_OBJECT_ID% ^
+    sqlAdminUser=%AZ_SQL_ADMIN_USER% ^
+    sqlAdminPassword=%AZ_SQL_ADMIN_PASSWORD% || exit /b 1
+
+echo Provisioning complete. Review outputs above for resource names and endpoints.
+endlocal
+exit /b 0

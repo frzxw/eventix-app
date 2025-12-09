@@ -1,0 +1,30 @@
+{
+  "name": "@eventix/inventory-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Eventix Inventory Service",
+  "main": "dist/src/functions/*.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "clean": "rimraf dist",
+    "prestart": "npm run clean && npm run build",
+    "start": "func start",
+    "test": "echo \"No tests yet...\""
+  },
+  "dependencies": {
+    "@azure/cosmos": "^4.9.0",
+    "@azure/functions": "^4.4.0",
+    "@azure/service-bus": "^7.9.4",
+    "applicationinsights": "^3.12.1",
+    "ioredis": "^5.5.0",
+    "mssql": "^12.2.0",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/mssql": "^9.1.8",
+    "@types/node": "^20.10.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.6.3"
+  }
+}

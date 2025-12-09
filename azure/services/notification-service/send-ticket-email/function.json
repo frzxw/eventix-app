@@ -1,0 +1,14 @@
+{
+  "bindings": [
+    {
+      "name": "message",
+      "type": "serviceBusTrigger",
+      "direction": "in",
+      "topicName": "ticket-issued",
+      "subscriptionName": "notification-service",
+      "connection": "SERVICE_BUS_CONNECTION_STRING"
+    }
+  ],
+  "scriptFile": "../dist/src/handlers/sendEmail.js",
+  "entryPoint": "sendTicketEmailHandler"
+}

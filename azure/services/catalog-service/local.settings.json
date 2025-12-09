@@ -1,0 +1,16 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "SQL_SERVER": "localhost",
+    "SQL_USER": "sa",
+    "SQL_PASSWORD": "StrongPassword123!",
+    "SQL_DATABASE": "eventix",
+    "APPINSIGHTS_CONNECTION_STRING": ""
+  },
+  "Host": {
+    "LocalHttpPort": 7072,
+    "CORS": "*"
+  }
+}

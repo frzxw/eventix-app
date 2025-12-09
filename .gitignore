@@ -1,0 +1,59 @@
+# Node dependencies
+node_modules/
+azure/functions/node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build artifacts
+dist/
+build/
+azure/functions/dist/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# Environment files
+.env
+.env.*
+!.env.example
+!.env.development.example
+!.env.production.example
+
+# Azure Functions local settings
+azure/functions/local.settings.json
+!azure/functions/local.settings.json.example
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.swp
+*~
+
+# Testing artifacts
+.nyc_output/
+*.lcov
+coverage/
+
+# Prisma & database files
+prisma/*.db
+
+# Misc
+.eslintcache
+.stylelintcache
+*.orig
+*.rej

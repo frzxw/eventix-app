@@ -1,0 +1,14 @@
+{
+  "bindings": [
+    {
+      "name": "message",
+      "type": "serviceBusTrigger",
+      "direction": "in",
+      "topicName": "ticket-issued",
+      "subscriptionName": "read-model-service",
+      "connection": "SERVICE_BUS_CONNECTION_STRING"
+    }
+  ],
+  "scriptFile": "../dist/src/handlers/ticketProjector.js",
+  "entryPoint": "ticketProjectorHandler"
+}
