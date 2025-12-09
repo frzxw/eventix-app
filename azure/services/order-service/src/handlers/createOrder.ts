@@ -1,7 +1,6 @@
 import { HttpRequest, HttpResponseInit } from '@azure/functions';
 import { z } from 'zod';
-import * as orderRepo from '../utils/orderRepository';
-import * as eventRepo from '../utils/eventRepository';
+import { getDb, sql } from '../utils/db';
 import { publishToTopic } from '../utils/serviceBus';
 import { formatZodError, readJsonBody, ticketSelectionSchema } from '../utils/validation';
 import {
@@ -15,16 +14,22 @@ import {
 const createOrderSchema = z
   .object({
     eventId: z.string().min(1, 'eventId is required'),
-    tickets: z.array(ticketSelectionSchema).min(1, 'At least one ticket selection is required'),
+    items: z.array(ticketSelectionSchema).min(1, 'At least one ticket selection is required'),
     holdToken: z.string().min(1, 'holdToken is required'),
-    attendeeInfo: z
+    customerDetails: z
       .object({
         firstName: z.string().min(1, 'firstName is required'),
         lastName: z.string().min(1, 'lastName is required'),
         email: z.string().email('A valid attendee email is required'),
         phone: z.string().min(6, 'attendee phone must have at least 6 digits'),
+        country: z.string().optional(),
       })
       .strict(),
+    payment: z
+      .object({
+        method: z.string().optional(),
+      })
+      .optional(),
   })
   .strict();
 
@@ -32,8 +37,6 @@ type CreateOrderBody = z.infer<typeof createOrderSchema>;
 
 export async function createOrderHandler(req: HttpRequest): Promise<HttpResponseInit> {
   try {
-    // Note: Authentication should be handled by middleware or extracted from headers
-    // For simplicity, assuming user ID is passed in header or we use a mock ID
     const userId = req.headers.get('x-user-id') || 'mock-user-id';
 
     const rawBody = await readJsonBody<CreateOrderBody>(req);
@@ -43,69 +46,121 @@ export async function createOrderHandler(req: HttpRequest): Promise<HttpResponse
     }
     const body = parsedBody.data;
 
-    // Validate Event
-    const event = await eventRepo.findEventById(body.eventId);
-    if (!event) {
-      return notFound('Event not found');
-    }
-
-    // Validate Categories
-    const categoryIds = body.tickets.map((t) => t.categoryId);
-    const categories = await eventRepo.findTicketCategoriesByIds(categoryIds);
-    if (categories.length !== categoryIds.length) {
-      return badRequest('One or more ticket categories not found');
-    }
+    const tickets = body.items;
+    const attendee = body.customerDetails;
 
     // Calculate Total
+    // In a real app, we should fetch prices from DB (TicketCategories) to avoid client-side manipulation
+    // For this implementation, we will fetch prices from DB
+    const pool = await getDb();
+    
+    // Fetch categories
+    const categoryIds = tickets.map(t => t.categoryId);
+    // Create a parameter for each category ID
+    const request = pool.request();
+    // We can't pass array directly to IN clause easily in mssql without table-valued parameter or dynamic SQL
+    // Simplified: fetch all categories for the event
+    request.input('eventId', sql.NVarChar, body.eventId);
+    const categoriesResult = await request.query('SELECT id, price FROM TicketCategories WHERE event_id = @eventId');
+    const dbCategories = categoriesResult.recordset;
+
     let totalAmount = 0;
     const orderItems = [];
-    for (const item of body.tickets) {
-      const cat = categories.find((c) => c.id === item.categoryId);
-      if (!cat) continue;
-      totalAmount += Number(cat.price) * item.quantity;
+
+    for (const item of tickets) {
+      const cat = dbCategories.find((c: any) => c.id === item.categoryId);
+      if (!cat) {
+          return badRequest(`Category ${item.categoryId} not found for this event`);
+      }
+      const price = Number(cat.price);
+      totalAmount += price * item.quantity;
       orderItems.push({
         categoryId: item.categoryId,
         quantity: item.quantity,
-        unitPrice: Number(cat.price),
+        unitPrice: price,
       });
     }
 
-    // Create Order
-    const order = await orderRepo.createOrderTransaction(
-      {
-        userId,
-        eventId: body.eventId,
-        subtotal: totalAmount,
-        totalAmount,
-        currency: 'USD', // Default for now
-        status: 'pending_payment',
-        paymentStatus: 'pending',
-        attendeeFirstName: body.attendeeInfo.firstName,
-        attendeeLastName: body.attendeeInfo.lastName,
-        attendeeEmail: body.attendeeInfo.email,
-        attendeePhone: body.attendeeInfo.phone,
-        holdToken: body.holdToken,
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 mins to pay
-      },
-      orderItems
-    );
+    const orderId = `ord_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    const orderNumber = `ORD-${Date.now()}`;
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+
+    try {
+        // Insert Order
+        await transaction.request()
+            .input('id', sql.NVarChar, orderId)
+            .input('orderNumber', sql.NVarChar, orderNumber)
+            .input('userId', sql.NVarChar, userId)
+            .input('eventId', sql.NVarChar, body.eventId)
+            .input('holdToken', sql.NVarChar, body.holdToken)
+            .input('status', sql.NVarChar, 'pending_payment')
+            .input('firstName', sql.NVarChar, attendee.firstName)
+            .input('lastName', sql.NVarChar, attendee.lastName)
+            .input('email', sql.NVarChar, attendee.email)
+            .input('phone', sql.NVarChar, attendee.phone)
+            .input('subtotal', sql.Decimal(10, 2), totalAmount)
+            .input('totalAmount', sql.Decimal(10, 2), totalAmount)
+            .input('expiresAt', sql.DateTime2, expiresAt)
+            .query(`
+                INSERT INTO Orders (
+                    id, order_number, user_id, event_id, hold_token, status, 
+                    attendee_first_name, attendee_last_name, attendee_email, attendee_phone,
+                    subtotal, total_amount, expires_at
+                ) VALUES (
+                    @id, @orderNumber, @userId, @eventId, @holdToken, @status,
+                    @firstName, @lastName, @email, @phone,
+                    @subtotal, @totalAmount, @expiresAt
+                )
+            `);
+
+        // Insert Order Items
+        for (const item of orderItems) {
+            await transaction.request()
+                .input('orderId', sql.NVarChar, orderId)
+                .input('categoryId', sql.NVarChar, item.categoryId)
+                .input('quantity', sql.Int, item.quantity)
+                .input('unitPrice', sql.Decimal(10, 2), item.unitPrice)
+                .query(`
+                    INSERT INTO OrderItems (order_id, category_id, quantity, unit_price)
+                    VALUES (@orderId, @categoryId, @quantity, @unitPrice)
+                `);
+        }
+
+        await transaction.commit();
+    } catch (err) {
+        await transaction.rollback();
+        throw err;
+    }
 
     // Publish Event
+    /*
     await publishToTopic('order-created', {
-      orderId: order.id,
-      eventId: order.event_id,
-      userId: order.user_id,
-      totalAmount: order.total_amount,
+      orderId: orderId,
+      eventId: body.eventId,
+      userId: userId,
+      totalAmount: totalAmount,
       holdToken: body.holdToken,
-    }, 'OrderCreated', order.event_id);
+    }, 'OrderCreated', body.eventId);
+    */
+
+    // Prepare for Midtrans Integration
+    const midtransToken = `midtrans_token_${orderId}`; 
+    const midtransRedirectUrl = `https://app.sandbox.midtrans.com/snap/v2/vtweb/${midtransToken}`;
 
     return created({
       success: true,
       data: {
-        orderId: order.id,
-        orderNumber: order.order_number,
-        status: order.status,
-        paymentLink: `/checkout/${order.id}`, // Mock link
+        orderId: orderId,
+        orderNumber: orderNumber,
+        status: 'pending_payment',
+        paymentLink: `/checkout/${orderId}`,
+        payment: {
+            token: midtransToken,
+            redirectUrl: midtransRedirectUrl
+        }
       },
     });
 
