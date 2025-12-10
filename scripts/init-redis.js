@@ -13,14 +13,30 @@ async function main() {
   const quantity = 15000; // From seed.sql
 
   const key = `inventory:${eventId}:${categoryId}`;
-  await redis.set(key, quantity);
-  console.log(`Set ${key} to ${quantity}`);
+  // Use HSET for compatibility with Lua scripts
+  await redis.hset(key, {
+    available: quantity,
+    total: quantity,
+    pending: 0,
+    version: 1
+  });
+  console.log(`Set ${key} to ${quantity} (Hash)`);
   
-  await redis.set(`inventory:${eventId}:cat-001-2`, 450);
-  console.log(`Set inventory:${eventId}:cat-001-2 to 450`);
+  await redis.hset(`inventory:${eventId}:cat-001-2`, {
+    available: 450,
+    total: 450,
+    pending: 0,
+    version: 1
+  });
+  console.log(`Set inventory:${eventId}:cat-001-2 to 450 (Hash)`);
 
-  await redis.set(`inventory:${eventId}:cat-001-3`, 10);
-  console.log(`Set inventory:${eventId}:cat-001-3 to 10`);
+  await redis.hset(`inventory:${eventId}:cat-001-3`, {
+    available: 10,
+    total: 10,
+    pending: 0,
+    version: 1
+  });
+  console.log(`Set inventory:${eventId}:cat-001-3 to 10 (Hash)`);
 
   redis.disconnect();
 }
