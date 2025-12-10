@@ -1,9 +1,8 @@
-import { defineConfig, type UserConfig } from 'vite';
+import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
-import type { InlineConfig as VitestConfig } from 'vitest';
 
-const config: UserConfig & { test: VitestConfig } = {
+export default defineConfig({
     plugins: [react()],
     define: {
       // Allow access to import.meta.env
@@ -69,6 +68,7 @@ const config: UserConfig & { test: VitestConfig } = {
     test: {
       globals: true,
       environment: 'jsdom',
+      // @ts-expect-error environmentMatchGlobs is valid but types are missing
       environmentMatchGlobs: [
         ['tests/backend/**/*.{test,spec}.{ts,tsx}', 'node'],
         ['azure/functions/**/*.{test,spec}.{ts,tsx}', 'node'],
@@ -84,6 +84,5 @@ const config: UserConfig & { test: VitestConfig } = {
         reporter: ['text', 'html'],
       },
     },
-  };
+});
 
-export default defineConfig(config);
