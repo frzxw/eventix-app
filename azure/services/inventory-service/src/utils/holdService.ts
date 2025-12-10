@@ -160,6 +160,17 @@ export async function markHoldCommitted(holdToken: string): Promise<boolean> {
   }
 }
 
+export async function getHold(holdToken: string): Promise<HoldEntry[] | null> {
+  const holdKey = `${HOLD_KEY_PREFIX}${holdToken}`;
+  const entriesJson = await redis.hget(holdKey, 'entries');
+  if (!entriesJson) return null;
+  try {
+    return JSON.parse(entriesJson) as HoldEntry[];
+  } catch {
+    return null;
+  }
+}
+
 export async function extendHold(holdToken: string, seconds: number): Promise<boolean> {
   const holdKey = `${HOLD_KEY_PREFIX}${holdToken}`;
   const exists = await redis.exists(holdKey);

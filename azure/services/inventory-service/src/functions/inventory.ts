@@ -1,5 +1,6 @@
 import { app } from '@azure/functions';
 import { attemptHoldHandler, extendHoldHandler } from '../handlers/holds';
+import { getInventoryHandler } from '../handlers/getInventory';
 import {
   joinQueueHandler,
   getQueueStatusHandler,
@@ -7,7 +8,7 @@ import {
   claimQueueHoldHandler,
 } from '../handlers/queue';
 import { capacitySyncHandler } from '../handlers/capacitySync';
-import { reservationExpiryHandler } from '../handlers/reservationExpiry';
+import { finalizeHoldHandler } from '../handlers/finalizeHold';
 import { redisCleanupHandler } from '../handlers/redisCleanup';
 import { initTelemetry } from '../utils/telemetry';
 
@@ -26,6 +27,13 @@ app.http('extendHold', {
   authLevel: 'anonymous',
   route: 'holds/extend',
   handler: extendHoldHandler,
+});
+
+app.http('getInventory', {
+  methods: ['GET'],
+  authLevel: 'anonymous',
+  route: 'inventory/{eventId}',
+  handler: getInventoryHandler,
 });
 
 app.http('joinQueue', {
@@ -63,12 +71,14 @@ app.serviceBusQueue('capacitySync', {
   handler: capacitySyncHandler,
 });
 
-// Timer Triggers
-app.timer('reservationExpiry', {
-  schedule: '0 */1 * * * *', // Every minute
-  handler: reservationExpiryHandler,
+app.serviceBusTopic('finalizeHold', {
+  connection: 'SERVICE_BUS_CONNECTION_STRING',
+  topicName: 'order-paid',
+  subscriptionName: 'inventory-service',
+  handler: finalizeHoldHandler,
 });
 
+// Timer Triggers
 app.timer('redisCleanup', {
   schedule: '0 */1 * * * *', // Every minute
   handler: redisCleanupHandler,

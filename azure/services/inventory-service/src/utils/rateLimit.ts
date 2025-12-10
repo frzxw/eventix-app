@@ -6,6 +6,7 @@ local key = KEYS[1]
 local limit = tonumber(ARGV[1])
 local window = tonumber(ARGV[2])
 local now = tonumber(ARGV[3])
+local member = ARGV[4]
 
 -- Remove old entries (older than now - window)
 redis.call('ZREMRANGEBYSCORE', key, '-inf', now - window)
@@ -15,7 +16,7 @@ local count = redis.call('ZCARD', key)
 
 if count < limit then
     -- Add new entry
-    redis.call('ZADD', key, now, now)
+    redis.call('ZADD', key, now, member)
     redis.call('EXPIRE', key, window)
     return {1, limit - count - 1, 0} -- Allowed, Remaining, RetryAfter
 else
@@ -44,6 +45,7 @@ export async function checkRateLimit(
 ): Promise<RateLimitResult> {
   const key = `ratelimit:${action}:${identifier}`;
   const now = Date.now() / 1000;
+  const member = `${now}:${Math.random()}`;
 
   try {
     const result = (await redis.eval(
@@ -52,7 +54,8 @@ export async function checkRateLimit(
       key,
       String(limit),
       String(windowSeconds),
-      String(now)
+      String(now),
+      member
     )) as [number, number, number];
 
     const allowed = result[0] === 1;

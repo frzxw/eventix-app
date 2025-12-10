@@ -115,8 +115,8 @@ export async function getQueueStatus(queueId: string, _correlationId?: string): 
   
   // Logic for "Ready":
   // If position is within the "allowed" window. 
-  // For this demo, let's say top 50 are always "ready" to try.
-  const ALLOWED_CONCURRENCY = 50;
+  // For this demo, let's say top 500 are always "ready" to try.
+  const ALLOWED_CONCURRENCY = 500;
   
   if (position <= ALLOWED_CONCURRENCY) {
       return {
@@ -127,7 +127,7 @@ export async function getQueueStatus(queueId: string, _correlationId?: string): 
           message: 'You are next! Proceed to booking.',
           // In a real flow, we might generate a temporary "pass" token here
           holdToken: queueId, // Reusing queueId as a simple token for now
-          holdExpiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString()
+          holdExpiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString()
       };
   }
 
@@ -172,8 +172,8 @@ export async function claimQueueHold(queueId: string, correlationId?: string, _c
       return { success: false, reason: 'NOT_IN_QUEUE' };
   }
   
-  // Allow top 50
-  if (rank > 50) {
+  // Allow top 500
+  if (rank > 500) {
       return { success: false, reason: 'NOT_READY', retryAfterSeconds: 5 };
   }
 
