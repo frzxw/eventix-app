@@ -11,11 +11,30 @@ if (process.env.COSMOS_ENDPOINT?.includes('localhost') || !process.env.COSMOS_EN
 }
 
 // SQL Configuration
-const sqlConfig = process.env.DATABASE_URL
-  ? {
-      connectionString: process.env.DATABASE_URL,
+let sqlConfig;
+if (process.env.DATABASE_URL) {
+    if (process.env.DATABASE_URL.startsWith('Server=')) {
+        // Parse ADO.NET connection string
+        const parts = process.env.DATABASE_URL.split(';');
+        const config = { options: { encrypt: true } };
+        for (const part of parts) {
+            const [key, value] = part.split('=');
+            if (!key || !value) continue;
+            const k = key.trim().toLowerCase();
+            const v = value.trim();
+            if (k === 'server') config.server = v.replace('tcp:', '').split(',')[0];
+            if (k === 'initial catalog') config.database = v;
+            if (k === 'user id') config.user = v;
+            if (k === 'password') config.password = v;
+            if (k === 'encrypt') config.options.encrypt = v.toLowerCase() === 'true';
+            if (k === 'trustservercertificate') config.options.trustServerCertificate = v.toLowerCase() === 'true';
+        }
+        sqlConfig = config;
+    } else {
+        sqlConfig = { connectionString: process.env.DATABASE_URL };
     }
-  : {
+} else {
+    sqlConfig = {
       user: process.env.SQL_USER || 'sa',
       password: process.env.SQL_PASSWORD || 'StrongPassword123!',
       server: process.env.SQL_SERVER || 'localhost',
@@ -25,6 +44,7 @@ const sqlConfig = process.env.DATABASE_URL
         trustServerCertificate: true,
       },
     };
+}
 
 // Cosmos Configuration
 const cosmosEndpoint = process.env.COSMOS_ENDPOINT || 'https://localhost:8081';
