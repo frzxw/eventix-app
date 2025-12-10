@@ -37,6 +37,7 @@
             "@radix-ui/react-tooltip": "^1.1.8",
             "@tanstack/react-query": "5.90.7",
             "axios": "^1.6.2",
+            "bcryptjs": "3.0.3",
             "class-variance-authority": "^0.7.1",
             "clsx": "*",
             "cmdk": "^1.1.1",
@@ -75,22 +76,20 @@
             "@types/supertest": "6.0.3",
             "@types/uuid": "10.0.0",
             "@vitejs/plugin-react-swc": "^3.10.2",
-            "husky": "9.1.7",
-            "ioredis-mock": "8.13.1",
+            "ioredis-mock": "4.7.0",
             "jsdom": "27.2.0",
             "playwright": "1.57.0",
             "supertest": "7.1.4",
             "tsx": "^4.19.0",
             "typescript": "^5.6.3",
             "vite": "^6.4.1",
-            "vitest": "^1.6.0"
+            "vitest": "4.0.15"
       },
       "scripts": {
             "dev": "vite",
             "build": "tsc && vite build",
             "preview": "vite preview",
             "test": "vitest run",
-            "prepare": "husky",
             "lint": "biome lint .",
             "check": "biome check ."
       }
