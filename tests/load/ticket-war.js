@@ -194,7 +194,10 @@ export default function () {
   });
 
   const paymentRes = http.post(`${PAYMENT_URL}/payments`, paymentPayload, {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'idempotency-key': randomString(12)
+      },
   });
 
   const paymentSuccess = check(paymentRes, {
