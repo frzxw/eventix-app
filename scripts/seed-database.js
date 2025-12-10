@@ -253,6 +253,7 @@ async function seed() {
         
         // Insert into SQL
         await pool.request()
+          .input('id', sql.NVarChar, catId)
           .input('eventId', sql.NVarChar, eventId)
           .input('name', sql.NVarChar, cat.name)
           .input('displayName', sql.NVarChar, `${cat.name} Access`)
@@ -260,8 +261,8 @@ async function seed() {
           .input('qty', sql.Int, qty)
           .input('sortOrder', sql.Int, sortOrder)
           .query(`
-            INSERT INTO TicketCategories (event_id, name, display_name, price, quantity_total, available_quantity, sort_order)
-            VALUES (@eventId, @name, @displayName, @price, @qty, @qty, @sortOrder)
+            INSERT INTO TicketCategories (id, event_id, name, display_name, price, quantity_total, available_quantity, sort_order)
+            VALUES (@id, @eventId, @name, @displayName, @price, @qty, @qty, @sortOrder)
           `);
 
         // Prepare for Cosmos

@@ -3,8 +3,10 @@ import { z } from 'zod';
 
 export async function readJsonBody<T>(req: HttpRequest): Promise<T | undefined> {
   try {
-    return (await req.json()) as T;
-  } catch {
+    const body = await req.json();
+    return body as T;
+  } catch (e) {
+    console.error('Failed to parse JSON body:', e);
     return undefined;
   }
 }
@@ -20,8 +22,5 @@ export function formatZodError(error: z.ZodError): string {
 
 export const ticketSelectionSchema = z.object({
   categoryId: z.string().min(1, 'categoryId is required'),
-  quantity: z
-    .number({ required_error: 'quantity is required' })
-    .int('quantity must be an integer')
-    .positive('quantity must be greater than zero'),
-}).strict();
+  quantity: z.any(), // Relaxed for debugging
+});

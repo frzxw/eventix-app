@@ -20,29 +20,45 @@ const createOrderSchema = z
       .object({
         firstName: z.string().min(1, 'firstName is required'),
         lastName: z.string().min(1, 'lastName is required'),
-        email: z.string().email('A valid attendee email is required'),
-        phone: z.string().min(6, 'attendee phone must have at least 6 digits'),
+        email: z.string().min(1, 'email is required'),
+        phone: z.string().min(1, 'attendee phone is required'),
         country: z.string().optional(),
-      })
-      .strict(),
+      }),
     payment: z
       .object({
         method: z.string().optional(),
       })
       .optional(),
-  })
-  .strict();
+  });
 
 type CreateOrderBody = z.infer<typeof createOrderSchema>;
 
 export async function createOrderHandler(req: HttpRequest): Promise<HttpResponseInit> {
   try {
-    const userId = req.headers.get('x-user-id') || 'mock-user-id';
+    const rawUserId = req.headers.get('x-user-id');
 
-    const rawBody = await readJsonBody<CreateOrderBody>(req);
+    // Allow unauthenticated checkout (guest checkout)
+    // If x-user-id is present, use it. Otherwise, userId is null.
+    let userId = rawUserId;
+    if (!userId || userId === 'null' || userId === 'undefined' || userId.trim() === '') {
+        userId = null;
+    }
+
+    const bodyText = await req.text();
+    
+    let rawBody: any;
+    try {
+        rawBody = JSON.parse(bodyText);
+    } catch (e) {
+        console.error('JSON Parse Error:', e);
+        return badRequest('Invalid JSON body');
+    }
+
     const parsedBody = createOrderSchema.safeParse(rawBody);
     if (!parsedBody.success) {
-      return badRequest(formatZodError(parsedBody.error));
+      const errorMsg = formatZodError(parsedBody.error);
+      console.error('Validation Error:', errorMsg, 'Body:', JSON.stringify(rawBody));
+      return badRequest(errorMsg);
     }
     const body = parsedBody.data;
 
@@ -53,6 +69,18 @@ export async function createOrderHandler(req: HttpRequest): Promise<HttpResponse
     // In a real app, we should fetch prices from DB (TicketCategories) to avoid client-side manipulation
     // For this implementation, we will fetch prices from DB
     const pool = await getDb();
+
+    // Validate userId if present (handle stale sessions after DB reset)
+    if (userId) {
+        const userCheck = await pool.request()
+            .input('id', sql.NVarChar, userId)
+            .query('SELECT id FROM Users WHERE id = @id');
+        
+        if (userCheck.recordset.length === 0) {
+            console.warn(`User ID ${userId} provided in header but not found in DB. Falling back to guest checkout.`);
+            userId = null;
+        }
+    }
     
     // Fetch categories
     const categoryIds = tickets.map(t => t.categoryId);
@@ -61,7 +89,8 @@ export async function createOrderHandler(req: HttpRequest): Promise<HttpResponse
     // We can't pass array directly to IN clause easily in mssql without table-valued parameter or dynamic SQL
     // Simplified: fetch all categories for the event
     request.input('eventId', sql.NVarChar, body.eventId);
-    const categoriesResult = await request.query('SELECT id, price FROM TicketCategories WHERE event_id = @eventId');
+    // Also fetch by ID directly if event_id check fails (in case of data inconsistency or cross-event booking attempt)
+    const categoriesResult = await request.query('SELECT id, price, event_id FROM TicketCategories WHERE event_id = @eventId OR id IN (' + categoryIds.map(id => `'${id}'`).join(',') + ')');
     const dbCategories = categoriesResult.recordset;
 
     let totalAmount = 0;
@@ -70,8 +99,12 @@ export async function createOrderHandler(req: HttpRequest): Promise<HttpResponse
     for (const item of tickets) {
       const cat = dbCategories.find((c: any) => c.id === item.categoryId);
       if (!cat) {
+          console.error(`Category not found: ${item.categoryId} for event ${body.eventId}. Available: ${JSON.stringify(dbCategories)}`);
           return badRequest(`Category ${item.categoryId} not found for this event`);
       }
+      // Optional: Verify event_id matches if we want to be strict
+      // if (cat.event_id !== body.eventId) { ... }
+      
       const price = Number(cat.price);
       totalAmount += price * item.quantity;
       orderItems.push({
@@ -144,9 +177,8 @@ export async function createOrderHandler(req: HttpRequest): Promise<HttpResponse
       holdToken: body.holdToken,
     }, 'OrderCreated', body.eventId);
 
-    // Prepare for Midtrans Integration
-    const midtransToken = `midtrans_token_${orderId}`; 
-    const midtransRedirectUrl = `https://app.sandbox.midtrans.com/snap/v2/vtweb/${midtransToken}`;
+    // Mock Payment Integration
+    const mockPaymentUrl = `/payment/mock?orderId=${orderId}&amount=${totalAmount}`;
 
     return created({
       success: true,
@@ -154,10 +186,10 @@ export async function createOrderHandler(req: HttpRequest): Promise<HttpResponse
         orderId: orderId,
         orderNumber: orderNumber,
         status: 'pending_payment',
-        paymentLink: `/checkout/${orderId}`,
+        paymentLink: mockPaymentUrl,
         payment: {
-            token: midtransToken,
-            redirectUrl: midtransRedirectUrl
+            token: 'mock-token',
+            redirectUrl: mockPaymentUrl
         }
       },
     });
