@@ -1,19 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { checkIdempotency, saveIdempotencyResult } from '../../../azure/services/payment-service/src/utils/idempotency';
-import { containers } from '../../../azure/services/payment-service/src/utils/cosmos';
+import { getDb, sql } from '../../../azure/services/payment-service/src/utils/db';
 
-// Mock Cosmos DB
-vi.mock('../../../azure/services/payment-service/src/utils/cosmos', () => ({
-  containers: {
-    idempotency: {
-      item: vi.fn().mockReturnThis(),
-      read: vi.fn(),
-      patch: vi.fn(), // Mock patch
-      items: {
-        create: vi.fn(),
-        upsert: vi.fn(),
-      }
-    }
+vi.mock('../../../azure/services/payment-service/src/utils/db', () => ({
+  getDb: vi.fn(),
+  sql: {
+    NVarChar: 'NVarChar',
+    Int: 'Int'
   }
 }));
 
@@ -21,49 +14,52 @@ describe('Payment Service - Idempotency', () => {
   const mockKey = 'idemp-123';
   const mockRecord = { 
     id: mockKey, 
-    idempotencyKey: mockKey,
     status: 'completed',
     responseStatus: 200,
-    responseBody: { paymentId: 'pay-123' },
-    createdAt: new Date().toISOString()
+    responseBody: JSON.stringify({ paymentId: 'pay-123' }),
+    createdAt: new Date()
+  };
+
+  const mockRequest = {
+    input: vi.fn().mockReturnThis(),
+    query: vi.fn()
+  };
+
+  const mockPool = {
+    request: vi.fn().mockReturnValue(mockRequest)
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
+    (getDb as Mock).mockResolvedValue(mockPool);
   });
 
   it('should return null if key does not exist', async () => {
-    (containers.idempotency.item as any).mockReturnValue({
-      read: vi.fn().mockResolvedValue({ resource: null })
-    });
+    mockRequest.query.mockResolvedValue({ recordset: [] });
 
     const result = await checkIdempotency(mockKey);
     expect(result).toBeNull();
   });
 
   it('should return stored record if key exists', async () => {
-    (containers.idempotency.item as any).mockReturnValue({
-      read: vi.fn().mockResolvedValue({ 
-        resource: mockRecord
-      })
-    });
+    mockRequest.query.mockResolvedValue({ recordset: [mockRecord] });
 
     const result = await checkIdempotency(mockKey);
-    expect(result).toEqual(mockRecord);
+    expect(result).toEqual({
+        ...mockRecord,
+        responseBody: JSON.parse(mockRecord.responseBody)
+    });
   });
 
-  it('should save idempotency result using patch', async () => {
-    const mockPatch = vi.fn();
-    (containers.idempotency.item as any).mockReturnValue({
-      patch: mockPatch
-    });
+  it('should save idempotency result', async () => {
+    mockRequest.query.mockResolvedValue({ rowsAffected: [1] });
 
     await saveIdempotencyResult(mockKey, 'completed', 200, { paymentId: 'pay-123' });
 
-    expect(mockPatch).toHaveBeenCalledWith(expect.arrayContaining([
-      { op: 'set', path: '/status', value: 'completed' },
-      { op: 'set', path: '/responseStatus', value: 200 },
-      { op: 'set', path: '/responseBody', value: { paymentId: 'pay-123' } }
-    ]));
+    expect(mockRequest.input).toHaveBeenCalledWith('id', sql.NVarChar, mockKey);
+    expect(mockRequest.input).toHaveBeenCalledWith('status', sql.NVarChar, 'completed');
+    expect(mockRequest.query).toHaveBeenCalled();
   });
 });
+
+
