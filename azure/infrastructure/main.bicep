@@ -374,9 +374,25 @@ resource eventStatusUpdatesTopic 'Microsoft.ServiceBus/namespaces/topics@2022-10
   }
 }
 
-resource capacitySyncTopic 'Microsoft.ServiceBus/namespaces/topics@2022-10-01-preview' = {
+resource capacitySyncQueue 'Microsoft.ServiceBus/namespaces/queues@2022-10-01-preview' = {
   parent: serviceBusNamespace
   name: 'capacity-sync'
+  properties: {
+    lockDuration: 'PT30S'
+    maxSizeInMegabytes: 1024
+    requiresDuplicateDetection: false
+    requiresSession: false
+    defaultMessageTimeToLive: 'P14D'
+    deadLetteringOnMessageExpiration: true
+    duplicateDetectionHistoryTimeWindow: 'PT10M'
+    maxDeliveryCount: 10
+    enableBatchedOperations: true
+  }
+}
+
+resource orderPaidTopic 'Microsoft.ServiceBus/namespaces/topics@2022-10-01-preview' = {
+  parent: serviceBusNamespace
+  name: 'order-paid'
   properties: {
     defaultMessageTimeToLive: 'P14D'
     maxSizeInMegabytes: 1024
@@ -385,14 +401,14 @@ resource capacitySyncTopic 'Microsoft.ServiceBus/namespaces/topics@2022-10-01-pr
   }
 }
 
-resource orderUpdatesTopic 'Microsoft.ServiceBus/namespaces/topics@2022-10-01-preview' = {
-  parent: serviceBusNamespace
-  name: 'order-updates'
+resource inventoryServiceSubscription 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2022-10-01-preview' = {
+  parent: orderPaidTopic
+  name: 'inventory-service'
   properties: {
+    lockDuration: 'PT30S'
+    maxDeliveryCount: 10
     defaultMessageTimeToLive: 'P14D'
-    maxSizeInMegabytes: 1024
-    requiresDuplicateDetection: false
-    enableBatchedOperations: true
+    deadLetteringOnMessageExpiration: true
   }
 }
 
@@ -431,7 +447,7 @@ resource sqlConnectionSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVault
   name: 'sql-connection-string'
   properties: {
-    value: format('sqlserver://{0}:1433;database={1};user={2};password={3};encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;', sqlServer.properties.fullyQualifiedDomainName, sqlDatabaseName, sqlAdminUser, sqlAdminPassword)
+    value: format('Server=tcp:{0},1433;Initial Catalog={1};Persist Security Info=False;User ID={2};Password={3};MultipleActiveResultSets=False;Encrypt=True;TrustServerCertificate=False;Connection Timeout=30;', sqlServer.properties.fullyQualifiedDomainName, sqlDatabaseName, sqlAdminUser, sqlAdminPassword)
   }
 }
 
@@ -598,12 +614,16 @@ resource functionApps 'Microsoft.Web/sites@2023-01-01' = [for service in service
           value: emailDispatchQueue.name
         }
         {
+          name: 'SERVICE_BUS_FINALIZATION_QUEUE'
+          value: paymentConfirmedQueue.name
+        }
+        {
           name: 'SB_TOPIC_EVENT_STATUS'
           value: eventStatusUpdatesTopic.name
         }
         {
           name: 'SB_TOPIC_CAPACITY_SYNC'
-          value: capacitySyncTopic.name
+          value: capacitySyncQueue.name
         }
         {
           name: 'REDIS_HOST'
@@ -657,6 +677,7 @@ resource functionAppCors 'Microsoft.Web/sites/config@2023-01-01' = [for (service
         deployStaticWebApp ? ['https://*.azurestaticapps.net'] : [],
         [
           'http://localhost:3000'
+          'http://localhost:5173'
         ]
       )
       supportCredentials: true
