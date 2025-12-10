@@ -43,6 +43,12 @@ export default function () {
   const categoryId = 'cat-001-1';
   const userId = `user-${randomString(8)}`;
   
+  // Headers with simulated IP to avoid rate limiting issues on localhost
+  const headers = { 
+      'Content-Type': 'application/json',
+      'X-Forwarded-For': `10.0.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`
+  };
+
   // 0. Think Time: User refreshing the page right before the drop
   sleep(Math.random() * 2);
 
@@ -53,9 +59,7 @@ export default function () {
     requesterId: userId
   });
   
-  const joinRes = http.post(`${BASE_URL}/queue/join`, joinPayload, {
-    headers: { 'Content-Type': 'application/json' },
-  });
+  const joinRes = http.post(`${BASE_URL}/queue/join`, joinPayload, { headers });
   
   const joined = check(joinRes, {
     'joined queue': (r) => r.status === 200,
@@ -63,7 +67,7 @@ export default function () {
   
   if (!joined) {
       queueJoinFailures.add(1);
-      if (Math.random() < 0.001) console.log(`Join failed: ${joinRes.status}`);
+      console.log(`Join failed: ${joinRes.status} ${joinRes.body}`);
       return;
   }
   
@@ -82,7 +86,7 @@ export default function () {
       const pollInterval = 2 + Math.random() * 3;
       sleep(pollInterval);
 
-      const statusRes = http.get(`${BASE_URL}/queue/status/${queueId}`);
+      const statusRes = http.get(`${BASE_URL}/queue/status/${queueId}`, { headers });
       
       if (statusRes.status === 200) {
           const status = statusRes.json('status');
@@ -105,16 +109,14 @@ export default function () {
       queueId: queueId
   });
   
-  const claimRes = http.post(`${BASE_URL}/queue/claim`, claimPayload, {
-      headers: { 'Content-Type': 'application/json' },
-  });
+  const claimRes = http.post(`${BASE_URL}/queue/claim`, claimPayload, { headers });
   
   const claimed = check(claimRes, {
       'queue claimed': (r) => r.status === 200,
   });
   
   if (!claimed) {
-      // Failed to claim (maybe timed out or race condition)
+      console.log(`Claim failed: ${claimRes.status} ${claimRes.body}`);
       return;
   }
 
@@ -131,9 +133,7 @@ export default function () {
     requesterId: userId,
   });
   
-  const holdRes = http.post(`${BASE_URL}/holds`, holdPayload, {
-      headers: { 'Content-Type': 'application/json' },
-  });
+  const holdRes = http.post(`${BASE_URL}/holds`, holdPayload, { headers });
   
   const holdStatus = holdRes.status;
   const holdProcessed = check(holdRes, {
@@ -141,7 +141,7 @@ export default function () {
   });
 
   if (!holdProcessed) {
-      if (Math.random() < 0.01) console.log(`Hold error: ${holdRes.status} ${holdRes.body}`);
+      console.log(`Hold error: ${holdRes.status} ${holdRes.body}`);
       return;
   }
 
@@ -169,7 +169,7 @@ export default function () {
   });
 
   const orderRes = http.post(`${ORDER_URL}/orders`, createOrderPayload, {
-      headers: { 'Content-Type': 'application/json', 'x-user-id': userId },
+      headers: { ...headers, 'x-user-id': userId },
   });
 
   const orderCreated = check(orderRes, {
@@ -177,6 +177,7 @@ export default function () {
   });
 
   if (!orderCreated) {
+      console.log(`Order creation failed: ${orderRes.status} ${orderRes.body}`);
       return;
   }
 
@@ -195,7 +196,7 @@ export default function () {
 
   const paymentRes = http.post(`${PAYMENT_URL}/payments`, paymentPayload, {
       headers: { 
-        'Content-Type': 'application/json',
+        ...headers,
         'idempotency-key': randomString(12)
       },
   });
@@ -206,5 +207,7 @@ export default function () {
 
   if (paymentSuccess) {
       successfulOrders.add(1);
+  } else {
+      console.log(`Payment failed: ${paymentRes.status} ${paymentRes.body}`);
   }
 }
