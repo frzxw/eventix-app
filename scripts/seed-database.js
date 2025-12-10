@@ -213,7 +213,8 @@ async function seed() {
       const venueCapacity = getRandomInt(5000, 50000);
       const isFeatured = i < 5 ? 1 : 0;
 
-      const eventId = randomUUID();
+      // Force specific ID for the first event for load testing
+      const eventId = i === 0 ? 'evt-001' : randomUUID();
 
       // Insert into SQL
       await pool.request()
@@ -249,7 +250,9 @@ async function seed() {
       for (const cat of categories) {
         const price = Math.floor(template.basePrice * cat.priceMultiplier);
         const qty = Math.floor(venueCapacity * cat.qtyPercent);
-        const catId = randomUUID();
+        
+        // Force specific IDs for the first event's categories
+        const catId = (i === 0) ? `cat-001-${sortOrder}` : randomUUID();
         
         // Insert into SQL
         await pool.request()
