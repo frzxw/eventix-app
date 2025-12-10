@@ -1,17 +1,23 @@
 const sql = require('mssql');
+const { CosmosClient } = require('@azure/cosmos');
 const bcrypt = require('bcryptjs');
 const { randomUUID } = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-// Configuration
-const config = process.env.DATABASE_URL
+// Disable TLS verification for local emulator if needed
+if (process.env.COSMOS_ENDPOINT?.includes('localhost') || !process.env.COSMOS_ENDPOINT) {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+}
+
+// SQL Configuration
+const sqlConfig = process.env.DATABASE_URL
   ? {
       connectionString: process.env.DATABASE_URL,
     }
   : {
-      user: process.env.SQL_USER,
-      password: process.env.SQL_PASSWORD,
+      user: process.env.SQL_USER || 'sa',
+      password: process.env.SQL_PASSWORD || 'StrongPassword123!',
       server: process.env.SQL_SERVER || 'localhost',
       database: process.env.SQL_DATABASE || 'eventix',
       options: {
@@ -19,6 +25,14 @@ const config = process.env.DATABASE_URL
         trustServerCertificate: true,
       },
     };
+
+// Cosmos Configuration
+const cosmosEndpoint = process.env.COSMOS_ENDPOINT || 'https://localhost:8081';
+const cosmosKey = process.env.COSMOS_KEY || 'C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw==';
+const cosmosDatabaseId = process.env.COSMOS_DATABASE || 'eventix';
+const cosmosContainerId = 'events';
+
+const cosmosClient = new CosmosClient({ endpoint: cosmosEndpoint, key: cosmosKey });
 
 const LOCATIONS = [
   { city: 'Jakarta', venues: ['Gelora Bung Karno Stadium', 'Jakarta International Stadium', 'Istora Senayan', 'Jakarta Convention Center'] },
@@ -80,41 +94,40 @@ function addDays(date, days) {
 }
 
 async function seed() {
-  console.log('Connecting to database...');
-  try {
-    const pool = await sql.connect(config);
-    console.log('Connected.');
+  console.log('Connecting to SQL database...');
+  const pool = await sql.connect(sqlConfig);
+  console.log('Connected to SQL.');
 
-    // 0. Run Schema
-    console.log('Applying schema...');
+  console.log('Connecting to Cosmos DB...');
+  const { database } = await cosmosClient.databases.createIfNotExists({ id: cosmosDatabaseId });
+  const { container } = await database.containers.createIfNotExists({ id: cosmosContainerId, partitionKey: '/id' });
+  console.log('Connected to Cosmos DB.');
+
+  try {
+    // 0. Run Schema (SQL)
+    console.log('Applying SQL schema...');
     const schemaPath = path.join(__dirname, '../azure/database/schema.sql');
     const schemaSql = fs.readFileSync(schemaPath, 'utf8');
     
-    // Split by GO and remove USE statements (as we are already connected to the DB)
     const batches = schemaSql
       .split(/GO\s*$/im)
       .map(batch => batch.trim())
       .filter(batch => batch.length > 0);
 
     for (const batch of batches) {
-      // Skip USE statements or CREATE DATABASE if we are already connected to the target DB
       if (batch.toUpperCase().startsWith('USE ') || batch.toUpperCase().startsWith('CREATE DATABASE ')) {
         continue;
       }
       try {
         await pool.query(batch);
       } catch (err) {
-        // Ignore "There is already an object named..." errors if we want idempotency, 
-        // but the schema uses IF NOT EXISTS so it should be fine.
-        // However, if the error is about something else, we should log it.
-        console.warn('Schema batch warning (might be harmless if exists):', err.message);
+        console.warn('Schema batch warning:', err.message);
       }
     }
-    console.log('Schema applied.');
+    console.log('SQL Schema applied.');
 
     // 1. Clean existing data
-    console.log('Cleaning tables...');
-    // Order matters due to FK constraints
+    console.log('Cleaning SQL tables...');
     await pool.query(`
       DELETE FROM PaymentLogs;
       DELETE FROM Tickets;
@@ -127,7 +140,13 @@ async function seed() {
       DELETE FROM Users;
     `);
 
-    // 2. Seed Users
+    console.log('Cleaning Cosmos DB container...');
+    // Recreating container is faster for full reset.
+    await container.delete();
+    await database.containers.createIfNotExists({ id: cosmosContainerId, partitionKey: '/id' });
+    console.log('Cosmos DB cleaned.');
+
+    // 2. Seed Users (SQL only for now, unless we want users in Cosmos too)
     console.log('Seeding Users...');
     const passwordHash = await bcrypt.hash('Password123!', 10);
     
@@ -168,74 +187,50 @@ async function seed() {
         `);
     }
 
-    // 3. Seed Events
+    // 3. Seed Events (SQL + Cosmos)
     console.log('Seeding Events...');
-    const events = [];
     const startDate = new Date();
 
-    // Generate 20 realistic events
     for (let i = 0; i < 20; i++) {
       const location = getRandomElement(LOCATIONS);
-      const venue = getRandomElement(location.venues);
+      const venueName = getRandomElement(location.venues);
       const template = getRandomElement(EVENT_TEMPLATES);
       const artist = getRandomElement(ARTISTS);
       
       const title = template.title.replace('{Artist}', artist).replace('{City}', location.city);
       const description = template.description.replace('{Artist}', artist).replace('{City}', location.city);
       
-      // Adjust title/desc for specific categories if needed
-      if (template.category === 'Sports' && title.includes('Indonesia')) {
-         // Keep as is
-      } else if (template.category === 'Concert') {
-         // Keep as is
-      }
-
       const eventDate = addDays(startDate, getRandomInt(10, 180));
       const year = eventDate.getFullYear();
       const time = `${getRandomInt(18, 21)}:00`;
 
-      // Image URLs (using Unsplash source for reliability)
-      let imageUrl = 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?q=80&w=2070&auto=format&fit=crop'; // Concert default
+      let imageUrl = 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?q=80&w=2070&auto=format&fit=crop';
       if (template.category === 'Conference') imageUrl = 'https://images.unsplash.com/photo-1544531586-fde5298cdd40?q=80&w=2070&auto=format&fit=crop';
       if (template.category === 'Sports') imageUrl = 'https://images.unsplash.com/photo-1461896836934-ffe607ba8211?q=80&w=2070&auto=format&fit=crop';
       if (template.category === 'Theater') imageUrl = 'https://images.unsplash.com/photo-1507676184212-d03ab07a11d0?q=80&w=2069&auto=format&fit=crop';
       if (template.category === 'Festival') imageUrl = 'https://images.unsplash.com/photo-1533174072545-e8d4aa97edf9?q=80&w=1974&auto=format&fit=crop';
 
-      const event = {
-        id: randomUUID(),
-        title,
-        artist: template.category === 'Concert' ? artist : (template.category === 'Festival' ? 'Various Artists' : 'Eventix'),
-        description,
-        category: template.category,
-        date: eventDate,
-        time,
-        year,
-        venueName: venue,
-        venueCity: location.city,
-        venueCapacity: getRandomInt(5000, 50000),
-        imageUrl,
-        bannerImageUrl: imageUrl,
-        isFeatured: i < 5 ? 1 : 0, // First 5 are featured
-        basePrice: template.basePrice
-      };
+      const venueCapacity = getRandomInt(5000, 50000);
+      const isFeatured = i < 5 ? 1 : 0;
 
-      events.push(event);
+      const eventId = randomUUID();
 
+      // Insert into SQL
       await pool.request()
-        .input('id', sql.NVarChar, event.id)
-        .input('title', sql.NVarChar, event.title)
-        .input('artist', sql.NVarChar, event.artist)
-        .input('description', sql.NVarChar, event.description)
-        .input('category', sql.NVarChar, event.category)
-        .input('date', sql.DateTime2, event.date)
-        .input('time', sql.NVarChar, event.time)
-        .input('year', sql.Int, event.year)
-        .input('venueName', sql.NVarChar, event.venueName)
-        .input('venueCity', sql.NVarChar, event.venueCity)
-        .input('venueCapacity', sql.Int, event.venueCapacity)
-        .input('imageUrl', sql.NVarChar, event.imageUrl)
-        .input('bannerImageUrl', sql.NVarChar, event.bannerImageUrl)
-        .input('isFeatured', sql.Bit, event.isFeatured)
+        .input('id', sql.NVarChar, eventId)
+        .input('title', sql.NVarChar, title)
+        .input('artist', sql.NVarChar, template.category === 'Concert' ? artist : (template.category === 'Festival' ? 'Various Artists' : 'Eventix'))
+        .input('description', sql.NVarChar, description)
+        .input('category', sql.NVarChar, template.category)
+        .input('date', sql.DateTime2, eventDate)
+        .input('time', sql.NVarChar, time)
+        .input('year', sql.Int, year)
+        .input('venueName', sql.NVarChar, venueName)
+        .input('venueCity', sql.NVarChar, location.city)
+        .input('venueCapacity', sql.Int, venueCapacity)
+        .input('imageUrl', sql.NVarChar, imageUrl)
+        .input('bannerImageUrl', sql.NVarChar, imageUrl)
+        .input('isFeatured', sql.Bit, isFeatured)
         .query(`
           INSERT INTO Events (id, title, artist, description, category, date, time, year, venueName, venueCity, venueCapacity, imageUrl, bannerImageUrl, isFeatured)
           VALUES (@id, @title, @artist, @description, @category, @date, @time, @year, @venueName, @venueCity, @venueCapacity, @imageUrl, @bannerImageUrl, @isFeatured)
@@ -249,32 +244,83 @@ async function seed() {
         { name: 'Silver', priceMultiplier: 1.0, qtyPercent: 0.4 }
       ];
 
+      const cosmosCategories = [];
       let sortOrder = 1;
       for (const cat of categories) {
-        const price = Math.floor(event.basePrice * cat.priceMultiplier);
-        const qty = Math.floor(event.venueCapacity * cat.qtyPercent);
+        const price = Math.floor(template.basePrice * cat.priceMultiplier);
+        const qty = Math.floor(venueCapacity * cat.qtyPercent);
+        const catId = randomUUID();
         
+        // Insert into SQL
         await pool.request()
-          .input('eventId', sql.NVarChar, event.id)
+          .input('eventId', sql.NVarChar, eventId)
           .input('name', sql.NVarChar, cat.name)
           .input('displayName', sql.NVarChar, `${cat.name} Access`)
           .input('price', sql.Decimal(10, 2), price)
           .input('qty', sql.Int, qty)
-          .input('sortOrder', sql.Int, sortOrder++)
+          .input('sortOrder', sql.Int, sortOrder)
           .query(`
             INSERT INTO TicketCategories (event_id, name, display_name, price, quantity_total, available_quantity, sort_order)
             VALUES (@eventId, @name, @displayName, @price, @qty, @qty, @sortOrder)
           `);
+
+        // Prepare for Cosmos
+        cosmosCategories.push({
+          id: catId,
+          name: cat.name,
+          displayName: `${cat.name} Access`,
+          price: price,
+          currency: 'IDR',
+          total: qty,
+          available: qty,
+          status: 'available',
+          benefits: [],
+          sortOrder: sortOrder
+        });
+        sortOrder++;
       }
+
+      // Insert into Cosmos DB
+      const prices = cosmosCategories.map(c => c.price);
+      const pricing = {
+        min: Math.min(...prices),
+        max: Math.max(...prices),
+        currency: 'IDR'
+      };
+
+      const eventDoc = {
+        id: eventId,
+        title,
+        artist: template.category === 'Concert' ? artist : (template.category === 'Festival' ? 'Various Artists' : 'Eventix'),
+        description,
+        category: template.category,
+        date: eventDate.toISOString().split('T')[0],
+        time,
+        venue: {
+          name: venueName,
+          city: location.city,
+          address: `${venueName}, ${location.city}`,
+          capacity: venueCapacity
+        },
+        image: imageUrl,
+        bannerImage: imageUrl,
+        featured: Boolean(isFeatured),
+        viewCount: getRandomInt(0, 1000),
+        tags: [template.category, location.city],
+        ticketCategories: cosmosCategories,
+        pricing
+      };
+
+      // Re-fetch container to ensure we are using the fresh one
+      const freshContainer = database.container(cosmosContainerId);
+      await freshContainer.items.create(eventDoc);
+      process.stdout.write('.');
     }
 
-    console.log('Seeding completed successfully!');
+    console.log('\nSeeding completed successfully!');
   } catch (err) {
     console.error('Seeding failed:', err);
   } finally {
-    // Close the pool if it was created
-    // Note: mssql.connect returns a pool, but also sets the global pool. 
-    // We can close the global pool.
     await sql.close();
   }
 }

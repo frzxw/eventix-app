@@ -136,7 +136,6 @@ export async function createOrderHandler(req: HttpRequest): Promise<HttpResponse
     }
 
     // Publish Event
-    /*
     await publishToTopic('order-created', {
       orderId: orderId,
       eventId: body.eventId,
@@ -144,7 +143,6 @@ export async function createOrderHandler(req: HttpRequest): Promise<HttpResponse
       totalAmount: totalAmount,
       holdToken: body.holdToken,
     }, 'OrderCreated', body.eventId);
-    */
 
     // Prepare for Midtrans Integration
     const midtransToken = `midtrans_token_${orderId}`; 
