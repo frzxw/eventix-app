@@ -25,7 +25,6 @@ var staticWebAppName = '${projectName}-app-${environment}'
 var sqlServerName = '${projectName}-sql-${environment}'
 var sqlDatabaseName = '${projectName}-db'
 var cosmosAccountName = '${projectName}-cosmos-${environment}'
-var functionAppName = '${projectName}-api-${environment}'
 var keyVaultName = '${projectName}-kv-${environment}'
 var cacheForRedisName = '${projectName}-cache-${environment}'
 var serviceBusName = '${projectName}-sb-${environment}'
@@ -512,8 +511,19 @@ resource appServicePlan 'Microsoft.Web/serverfarms@2023-01-01' = {
 }
 
 // ==================== Function App ====================
-resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
-  name: functionAppName
+var services = [
+  'auth'
+  'catalog'
+  'inventory'
+  'notification'
+  'order'
+  'payment'
+  'read-model'
+  'ticket'
+]
+
+resource functionApps 'Microsoft.Web/sites@2023-01-01' = [for service in services: {
+  name: '${projectName}-${service}-api-${environment}'
   location: location
   kind: 'functionapp'
   identity: {
@@ -614,12 +624,12 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
       ]
     }
   }
-}
+}]
 
 // Enable function app diagnostics
-resource functionAppDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
-  name: '${functionAppName}-diagnostics'
-  scope: functionApp
+resource functionAppDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = [for (service, i) in services: {
+  name: '${projectName}-${service}-api-${environment}-diagnostics'
+  scope: functionApps[i]
   properties: {
     workspaceId: logAnalytics.id
     logs: [
@@ -635,11 +645,11 @@ resource functionAppDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-0
       }
     ]
   }
-}
+}]
 
 // ==================== CORS Configuration for Function App ====================
-resource functionAppCors 'Microsoft.Web/sites/config@2023-01-01' = {
-  parent: functionApp
+resource functionAppCors 'Microsoft.Web/sites/config@2023-01-01' = [for (service, i) in services: {
+  parent: functionApps[i]
   name: 'web'
   properties: {
     cors: {
@@ -652,25 +662,23 @@ resource functionAppCors 'Microsoft.Web/sites/config@2023-01-01' = {
       supportCredentials: true
     }
   }
-}
+}]
 
 // ==================== Function App Access to Key Vault ====================
 resource functionAppKeyVaultAccess 'Microsoft.KeyVault/vaults/accessPolicies@2023-07-01' = {
   parent: keyVault
   name: 'add'
   properties: {
-    accessPolicies: [
-      {
-        tenantId: subscription().tenantId
-        objectId: functionApp.identity.principalId
-        permissions: {
-          secrets: [
-            'get'
-            'list'
-          ]
-        }
+    accessPolicies: [for (service, i) in services: {
+      tenantId: subscription().tenantId
+      objectId: functionApps[i].identity.principalId
+      permissions: {
+        secrets: [
+          'get'
+          'list'
+        ]
       }
-    ]
+    }]
   }
 }
 
@@ -691,7 +699,6 @@ output serviceBusNamespaceName string = serviceBusNamespace.name
 output appInsightsId string = appInsights.id
 output appInsightsInstrumentationKey string = appInsights.properties.InstrumentationKey
 output appInsightsConnectionString string = appInsights.properties.ConnectionString
-output functionAppId string = functionApp.id
-output functionAppName string = functionApp.name
-output functionAppUrl string = 'https://${functionApp.properties.defaultHostName}/api'
+output functionAppNames array = [for (service, i) in services: functionApps[i].name]
+output functionAppUrls array = [for (service, i) in services: 'https://${functionApps[i].properties.defaultHostName}/api']
 output staticWebAppNameOutput string = deployStaticWebApp ? staticWebApp.name : ''
