@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { CreditCard, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { SERVICES } from '@/lib/constants';
 
 export default function MockPaymentPage() {
   const navigate = useNavigate();
@@ -23,8 +24,27 @@ export default function MockPaymentPage() {
     if (!orderId) return;
     try {
       setProcessing(true);
-      // Simulate gateway latency
-      await new Promise((r) => setTimeout(r, 1200));
+      
+      // Call Payment Service
+      const response = await fetch(`${SERVICES.PAYMENT}/payments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          orderId,
+          amount,
+          currency: 'IDR',
+          paymentMethod: 'mock-credit-card',
+          token: 'mock-token'
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Payment failed: ${response.statusText}`);
+      }
+
       toast.success('Payment successful');
       navigate(`/order-confirmation?orderId=${encodeURIComponent(orderId)}`);
     } catch (e) {

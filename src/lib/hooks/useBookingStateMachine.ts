@@ -55,7 +55,7 @@ export type BookingActions = {
   cancelQueue: () => Promise<void>;
   extendHold: () => Promise<void>;
   reset: () => void;
-  checkout: (payload: BookingCheckoutPayload) => Promise<{ success: boolean; orderId?: string; error?: string }>;
+  checkout: (payload: BookingCheckoutPayload) => Promise<{ success: boolean; orderId?: string; paymentLink?: string; error?: string }>;
 };
 
 export type BookingStateMachine = {
@@ -566,7 +566,11 @@ export function useBookingStateMachine(): BookingStateMachine {
         holdId: current.holdId || '',
       });
       clearState();
-      return { success: true, orderId: (response.data as any)?.orderId || generateId() };
+      return { 
+        success: true, 
+        orderId: (response.data as any)?.orderId || generateId(),
+        paymentLink: (response.data as any)?.paymentLink
+      };
     } catch (error) {
       logger.error('Checkout mutation failed', { error });
       azureMonitoring.trackEvent('checkout_failed', {

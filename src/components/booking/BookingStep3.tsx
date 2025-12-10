@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { 
   CreditCard, 
@@ -32,7 +33,7 @@ interface BookingStep3Props {
   attendeeInfo: AttendeeInfo;
   onComplete: (orderId: string) => void;
   onBack: () => void;
-  onCheckout: (paymentMethod: PaymentMethod) => Promise<{ success: boolean; orderId?: string; error?: string }>;
+  onCheckout: (paymentMethod: PaymentMethod) => Promise<{ success: boolean; orderId?: string; paymentLink?: string; error?: string }>;
   isCheckoutPending?: boolean;
   holdInfo?: {
     holdId?: string;
@@ -54,6 +55,7 @@ export function BookingStep3({
   isCheckoutPending,
   holdInfo,
 }: BookingStep3Props) {
+  const navigate = useNavigate();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('credit-card');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -73,7 +75,11 @@ export function BookingStep3({
     try {
       const result = await onCheckout(paymentMethod);
       if (result.success && result.orderId) {
-        onComplete(result.orderId);
+        if (result.paymentLink) {
+          navigate(result.paymentLink);
+        } else {
+          onComplete(result.orderId);
+        }
       }
       setIsProcessing(false);
     } catch (error) {

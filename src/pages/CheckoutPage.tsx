@@ -113,7 +113,7 @@ export function CheckoutPage() {
     });
 
     if (result.success && result.orderId) {
-      handleComplete(result.orderId);
+      // Navigation handled by BookingStep3
     } else if (result.error) {
       if (result.error === 'processing') {
         toast.info('Your order is being processed. Please do not refresh.');
