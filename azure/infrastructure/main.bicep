@@ -17,9 +17,10 @@ param deployerObjectId string = ''
 
 // Generate unique suffix for global resources
 var uniqueSuffix = substring(uniqueString(resourceGroup().id), 0, 6)
+var projectNameClean = toLower(replace(projectName, '-', ''))
 
 // Resource naming
-var storageAccountName = '${projectName}storage${uniqueSuffix}'
+var storageAccountName = '${projectNameClean}store${uniqueSuffix}'
 var staticWebAppName = '${projectName}-app-${environment}'
 var sqlServerName = '${projectName}-sql-${environment}'
 var sqlDatabaseName = '${projectName}-db'
@@ -30,7 +31,7 @@ var cacheForRedisName = '${projectName}-cache-${environment}'
 var serviceBusName = '${projectName}-sb-${environment}'
 var appInsightsName = '${projectName}-insights-${environment}'
 var logAnalyticsWorkspaceName = '${projectName}-law-${environment}'
-var functionStorageAccountName = '${projectName}funcstore${uniqueSuffix}'
+var functionStorageAccountName = '${projectNameClean}func${uniqueSuffix}'
 var appServicePlanName = '${projectName}-plan-${environment}'
 
 var keyVaultInitialPolicies = deployerObjectId == '' ? [] : [
@@ -609,10 +610,6 @@ resource functionApp 'Microsoft.Web/sites@2023-01-01' = {
         {
           name: 'REDIS_TLS_ENABLED'
           value: 'true'
-        }
-        {
-          name: 'BLOB_STORAGE_CONNECTION_STRING'
-          value: 'DefaultEndpointsProtocol=https;AccountName=${storageAccount.name};AccountKey=${storageAccount.listKeys().keys[0].value};EndpointSuffix=core.windows.net'
         }
       ]
     }

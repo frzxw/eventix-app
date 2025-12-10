@@ -34,7 +34,7 @@ az deployment group create ^
   --template-file "%~dp0..\infrastructure\main.bicep" ^
   --parameters ^
     location=%AZ_LOCATION% ^
-    projectName=eventix ^
+    projectName=%AZ_PROJECT_NAME% ^
     environment=prod ^
     deployStaticWebApp=%AZ_DEPLOY_STATIC_WEB_APP% ^
     staticWebAppLocation=%AZ_STATIC_WEB_APP_LOCATION% ^
