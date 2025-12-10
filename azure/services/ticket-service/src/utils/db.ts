@@ -1,15 +1,20 @@
 import sql from 'mssql';
 
-const config: sql.config = {
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  server: process.env.DB_SERVER || 'localhost',
-  database: process.env.DB_DATABASE || 'eventix',
-  options: {
-    encrypt: true,
-    trustServerCertificate: true,
-  },
-};
+const config: sql.config = process.env.DATABASE_URL
+  ? {
+      // @ts-ignore
+      connectionString: process.env.DATABASE_URL,
+    }
+  : {
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      server: process.env.DB_SERVER || 'localhost',
+      database: process.env.DB_DATABASE || 'eventix',
+      options: {
+        encrypt: true,
+        trustServerCertificate: true,
+      },
+    };
 
 let pool: sql.ConnectionPool | null = null;
 
