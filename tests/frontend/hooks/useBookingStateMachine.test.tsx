@@ -13,8 +13,8 @@ vi.mock('@/lib/services/bookingQueueClient', async () => {
   return {
     ...actual,
     bookingQueueClient: {
-      attemptHold: vi.fn<[], Promise<HoldAttemptResult>>(),
-      joinQueue: vi.fn<[], Promise<HoldAttemptResult>>(),
+      attemptHold: vi.fn<() => Promise<HoldAttemptResult>>(),
+      joinQueue: vi.fn<() => Promise<HoldAttemptResult>>(),
       getQueueStatus: vi.fn().mockResolvedValue(null),
       leaveQueue: vi.fn(),
       extendHold: vi.fn(),
